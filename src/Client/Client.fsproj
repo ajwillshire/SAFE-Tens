@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <DefineConstants>FABLE_COMPILER</DefineConstants>
+    </PropertyGroup>
+    <ItemGroup>
+        <None Include="index.html" />
+        <None Include="paket.references" />
+        <None Include="style.scss" />
+        <Compile Include="..\Shared\Shared.fs" />
+        <Compile Include="Version.fs" />
+        <Compile Include="Client.fs" />
+    </ItemGroup>
+    <ItemGroup>
+      <PackageReference Include="Fable.Browser.WebSocket" Version="1.0.0" />
+      <PackageReference Include="Fable.Remoting.Client" Version="5.10.2" />
+      <PackageReference Include="Feliz" Version="0.68.10" />
+      <PackageReference Include="Feliz.Recharts" Version="0.0.48" />
+    </ItemGroup>
+    <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>
