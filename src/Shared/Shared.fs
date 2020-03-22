@@ -1,31 +1,30 @@
 namespace Shared
-
 open System
-
+open Browser.Types
 
 module TensTypes =
-    [<CLIMutable>]
+
+    type Player =
+        {
+        socketId:Option<Guid>
+        playerId:Option<int>
+        playerName:Option<string>
+        playerWs:Option<WebSocket>
+        }
+
+
     type ClickedNumberIndex =
         { number: int
           listIndex : int}
 
-    //State of the game, held by CurrentGame
-    type GameCommand =
-        | Continue
-        | Stop
-
-    type Game =
-        {
-         cmd:GameCommand
-         score:int
-        }
+    //type Score = Score of int
 
     type msgAndColour =  {msg:string; colour:int}
 
     type ConsoleMessage =
             | Simple of string
             | Complex of msgAndColour
-
+            | Error of exn
 
     
 
@@ -33,15 +32,12 @@ module CommTypes =
 
     open TensTypes
 
-    //type ClickedNumber = ClickedNumber of int
-
     type GameNumbers =
         | RandomNumbers of int list
         | ClickedNumbers of int list
 
-    type injectedFunction = int list -> int
-  
     let getNumberByIndex(RandomNumbers(data)|ClickedNumbers(data)) i = data.[i]
+
     let ForEachNumber(RandomNumbers(data)|ClickedNumbers(data)) dothis = data |> List.mapi dothis
 
     let addToGameNumbers(input:GameNumbers) newNum =
@@ -75,54 +71,59 @@ module MessageTypes =
     open CommTypes
     open TensTypes
 
+    type Instruction =
+        | NewPlayer of Player
+        | NewGame
+        | StartGame
+        | RestartGame
+        | StopGame //- Issued from the server to the client
+        | StartRandom
+        | StopRandom
+        | NewClickedNumber of ClickedNumberIndex
+        | ClearNumbers 
+        | SingleAuto 
+        | StartAuto 
+        | StopAuto
+        | RemoveNumber of ClickedNumberIndex //Internal (Server)
+        | IncrementScore of int //Internal (Server)
+        | SendMeNumbers //Internal (Server)
+        | Poke //Internal (Server)
 
-    //Message from ClickedHandler and RandomHandler to Scorekeeper
+
     type FailMessage =
         | TooManyNumbers //From RandomHandler
         | OverTen //From ClickedHandler
 
+    type Score = Score of int
 
-    //Message from Scorekeeper to Counter for starting/stopping
-    type CounterMessage =
-        | Start
-        | Stop
+    let scoreValue(Score i) = i
+
+
+    type GameData =
+        | GameNums of GameNumbers
+        | ScoreUpdate of Score
+        | HighScore of Score
+        | SetChannelSocketId of Guid
+        | SetWebSocket of WebSocket
+        | SetPlayerId of int
+        | Fail of FailMessage // Internal (Server)
+        | NewRandom of int //Internal (Server) - from random generator to RandomHandler
+
 
 
     type Msg =
-    | Initialise
+        | Instruction of Instruction
+        | GameData of GameData
+        | WriteToConsole of ConsoleMessage
 
-    | Start
-    | Restart
 
-    | StartRandom
-    | StopRandom
+    type PlayerMessage =
+        {msg : Msg
+         plyr: Player}
 
-    | NewClickedNumber of ClickedNumberIndex
 
-    //| NewClickedNumbers of ClickedNumberIndex list
 
-    | GameNums of GameNumbers
 
-    | GameUpdate of Game // Only goes from Server -> Client
-
-    | ClearNumbers
-
-    | WriteToConsole of ConsoleMessage
-
-    | MsgError of exn //Internal (Client)
-    | SetChannelSocketId of Guid //Internal (Client)
-
-    //| CheckNumbers of GameNumbers //Internal (Server)
-    | RemoveNumber of ClickedNumberIndex //Internal (Server)
-    | IncrementScore of int //Internal (Server)
-    | Fail of FailMessage // Internal (Server)
-    | NewRandom of int //Internal (Server) - from random generator to RandomHandler
-
-    | AskForNumbers
-    | Poke
-    | SingleAuto
-    | StartAuto
-    | StopAuto
 
 
 

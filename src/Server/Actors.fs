@@ -1,32 +1,40 @@
 module Actors
 
 open System
-
-open Akka.FSharp
-open Router
-open Shared
-open Akka.Actor
+open FSharp.Control.Tasks.V2
 open Microsoft.FSharp.Core.Operators
+open Microsoft.AspNetCore.Http
+open Giraffe
+open Akka.FSharp
+open Akka.Actor
 
+open Shared
 open CommTypes
 open TensTypes
 open MessageTypes
-open Microsoft.AspNetCore.Http
-open FSharp.Control.Tasks.V2
-open Giraffe
-open System.Threading.Tasks
-
+open Saturn
 
 let debug = true
-let overDebug = false
+let overDebug = true
 
-let cnslMsg m c = WriteToConsole ({msg = m; colour = int c} |> Complex)
 
 
 let private random = System.Random()
 
+//Overload <! to ensure that only a Msg can be sent using <!
+//let private (<!) a (b:Msg) = a<!b
 
-let tensSystem = System.create "tensSystem" <| Configuration.load ()
+//Add a new operator to make it simpler to pass instructions around the place - Msg | Instruction
+let private (<!!) a (b:Instruction) = a <! (Instruction b)
+
+//Add a new operator to make it simpler to pass data around the place - Msg | GameData
+let private (<!&) a (b:GameData) = a <! (GameData b)
+
+//This is the creation of the system - needs to be up here as it's referred to a lot!
+//let tensSystem = System.create "tensSystem" <| Configuration.load ()
+
+//Helper function to make it easier to send messages to the console
+let cnslMsg m c = WriteToConsole ({msg = m; colour = int c} |> Complex)
 
 //Take all of the console messages and deal with them concurrently - it keeps the colours in check!
 let consoleWriter (mailbox: Actor<Msg>) =
@@ -40,6 +48,9 @@ let consoleWriter (mailbox: Actor<Msg>) =
                                                     Console.WriteLine(c.msg)
                                                     Console.ResetColor()
                                     | Simple s -> Console.WriteLine(s)
+                                    | Error e -> Console.ForegroundColor <- ConsoleColor.Red
+                                                 Console.WriteLine(e.Message)
+                                                 Console.ResetColor()
 
             | _ -> ()
 
@@ -48,54 +59,59 @@ let consoleWriter (mailbox: Actor<Msg>) =
     loop ()
 
 
+//Used by the scheduler to keep track of Cancelables to cease messages
 type LocalCancelables =
     {
         randomCancel:Cancelable
         autoCancel:Cancelable
     }
 
-let scheduler (mailbox: Actor<Msg>) = //genAgent
+let scheduler (mailbox: Actor<Msg>) =
 
     let consoleWriter = select "/user/consoleWriter" mailbox.Context.System
-    let genAgent = select "/user/randomGenerator"  mailbox.Context.System
-    let autoPlayer = select "/user/auto"  mailbox.Context.System
+    let genAgent = select "../randomGenerator"  mailbox.Context
+    let autoPlayer = select "../auto"  mailbox.Context
 
     consoleWriter <! cnslMsg "Scheduler created" ConsoleColor.Blue
 
-    let myScheduler = tensSystem.Scheduler
+    let myScheduler = mailbox.Context.System.Scheduler
 
     let initialCancelables = {randomCancel =new Cancelable(myScheduler); autoCancel = new Cancelable(myScheduler) }
-
 
     let rec loop (myCancelables:LocalCancelables) = actor {
         let! message = mailbox.Receive ()
 
+        
         match message with
-        | StartRandom ->
-            myCancelables.randomCancel.Cancel() //Hit cancel in case there's one already running
-            let newCancelables = {myCancelables with randomCancel=new Cancelable(myScheduler)}
+
+        | Instruction i -> match i with
+                            | StartRandom ->
+                                myCancelables.randomCancel.Cancel() //Hit cancel in case there's one already running
+                                let newCancelables = {myCancelables with randomCancel=new Cancelable(myScheduler)}
        
-            consoleWriter <! cnslMsg "Send scheduled messages!" ConsoleColor.Red
-            myScheduler.ScheduleTellRepeatedly(TimeSpan.Zero, TimeSpan.FromSeconds(1.), genAgent, Poke, ActorRefs.Nobody, newCancelables.randomCancel)
-            return! loop(newCancelables)
+                                consoleWriter <! cnslMsg "Send scheduled messages!" ConsoleColor.Red
+                                myScheduler.ScheduleTellRepeatedly(TimeSpan.Zero, TimeSpan.FromSeconds(1.), genAgent, Instruction Poke, ActorRefs.Nobody, newCancelables.randomCancel)
+                                return! loop(newCancelables)
 
-        | StopRandom -> 
-            consoleWriter <! cnslMsg "Stop scheduled messages!" ConsoleColor.Red
-            myCancelables.randomCancel.Cancel() 
-            return! loop(myCancelables)
+                            | StopRandom -> 
+                                consoleWriter <! cnslMsg "Stop scheduled messages!" ConsoleColor.Red
+                                myCancelables.randomCancel.Cancel() 
+                                return! loop(myCancelables)
 
-        | StartAuto ->
-            myCancelables.autoCancel.Cancel() //Hit cancel in case there's one already running
-            let newCancelables = {myCancelables with autoCancel=new Cancelable(myScheduler)}
+                            | StartAuto ->
+                                myCancelables.autoCancel.Cancel() //Hit cancel in case there's one already running
+                                let newCancelables = {myCancelables with autoCancel=new Cancelable(myScheduler)}
        
-            consoleWriter <! cnslMsg "Start autopick!" ConsoleColor.Magenta
-            myScheduler.ScheduleTellRepeatedly(TimeSpan.Zero, TimeSpan.FromSeconds(1.5), autoPlayer, Poke, ActorRefs.Nobody, newCancelables.autoCancel)
-            return! loop(newCancelables)
+                                consoleWriter <! cnslMsg "Start autopick!" ConsoleColor.Magenta
+                                myScheduler.ScheduleTellRepeatedly(TimeSpan.Zero, TimeSpan.FromSeconds(1.5), autoPlayer, Instruction Poke, ActorRefs.Nobody, newCancelables.autoCancel)
+                                return! loop(newCancelables)
 
-        | StopAuto ->
-            consoleWriter <! cnslMsg "Stop autopick!" ConsoleColor.Magenta
-            myCancelables.autoCancel.Cancel()
-            return! loop(myCancelables)
+                            | StopAuto ->
+                                consoleWriter <! cnslMsg "Stop autopick!" ConsoleColor.Magenta
+                                myCancelables.autoCancel.Cancel()
+                                return! loop(myCancelables)
+
+                            | _ -> return! loop (myCancelables)
 
         | _ -> return! loop (myCancelables)
         
@@ -106,7 +122,7 @@ let scheduler (mailbox: Actor<Msg>) = //genAgent
 let randomNumberGenerator (mailbox: Actor<Msg>) =
 
     let consoleWriter = select "/user/consoleWriter" mailbox.Context.System
-    let randomHandler = select "/user/randomHandler"  mailbox.Context.System
+    let randomHandler = select "../randomHandler"  mailbox.Context
 
     consoleWriter <! cnslMsg "Random generator created" ConsoleColor.Blue
 
@@ -114,9 +130,9 @@ let randomNumberGenerator (mailbox: Actor<Msg>) =
         let! message = mailbox.Receive()
 
         match message with
-        | Poke -> let newNum = random.Next(1,9)
-                  if overDebug then consoleWriter <! cnslMsg (string newNum) ConsoleColor.DarkBlue
-                  randomHandler <! Msg.NewRandom newNum
+        | Instruction Poke -> let newNum = random.Next(1,9)
+                              if overDebug then consoleWriter <! cnslMsg (string newNum) ConsoleColor.DarkBlue
+                              randomHandler <!& NewRandom newNum
         | _ -> ()
         
         return! loop ()
@@ -124,71 +140,41 @@ let randomNumberGenerator (mailbox: Actor<Msg>) =
     loop ()
 
 
-let communicator (mailbox:Actor<Msg>) =
-
-    let consoleWriter = select "/user/consoleWriter" mailbox.Context.System
-    consoleWriter <! cnslMsg "Communicator created" ConsoleColor.Blue
-
-    let rec loop () = actor {
-        let! msg = mailbox.Receive()
-
-        match msg with
-        | GameNums n ->    match n with
-                           | RandomNumbers _ -> do (Channel.easySendMessage "numbers" n "Communications Error (Random)") |> ignore
-                                                if overDebug then consoleWriter <! cnslMsg "Sent random numbers to Client"  ConsoleColor.DarkBlue
-
-                           | ClickedNumbers _ -> do (Channel.easySendMessage "numbers" n "Communications Error (Clicked)") |> ignore
-                                                 if overDebug then consoleWriter <! cnslMsg "Sent clicked numbers to Client"  ConsoleColor.DarkBlue
-
-                           return! loop ()
-
-        //| WriteMessage str -> do (Channel.easySendMessage "message" str) |> ignore
-
-        | GameUpdate g -> do (Channel.easySendMessage "gameUpdate" g "Communications Error (Game Update)") |> ignore
-                          if overDebug then consoleWriter <! cnslMsg ("Sent game update to Client - score:" + string g.score)  ConsoleColor.DarkBlue
-
-        | Fail f -> match f with
-                    | TooManyNumbers -> do (Channel.easySendMessage "message" "Failed - Too many numbers!") |> ignore
-                    | OverTen -> do (Channel.easySendMessage "message" "Failed - Sum was too high!") |> ignore
-
-
-        | _ -> ()
-
-        return! loop ()
-
-    }
-    loop ()
-
-
 let randomHandler (mailbox: Actor<Msg>) =
 
     let consoleWriter = select "/user/consoleWriter" mailbox.Context.System
-    let communicator = select "/user/communicator"  mailbox.Context.System
-    let validator = select "/user/validator"  mailbox.Context.System
+    let communicator = select "../communicator"  mailbox.Context
+    let validator = select "../validator"  mailbox.Context
 
     consoleWriter <! cnslMsg "RandomHandler created" ConsoleColor.Blue
 
     let rec loop (randomNumbers:GameNumbers) = actor {
         let! msg = mailbox.Receive()
 
-
         match msg with
-        | NewRandom i -> let newNums = addToGameNumbers randomNumbers i
-                         communicator <! GameNums newNums
-                         validator <! GameNums newNums //Only needs to happen here as the list grows
-                         return! loop (newNums)
 
-        | RemoveNumber i -> let newNums = removeFromGameNumbers randomNumbers i
-                            communicator <! GameNums newNums
-                            return! loop (newNums)
+        | Instruction i -> match i with
+                            | ClearNumbers -> let newNums = RandomNumbers[]
+                                              communicator <!& GameNums newNums
+                                              if overDebug then consoleWriter <! cnslMsg "Clearing random numbers" ConsoleColor.DarkCyan
+                                              return! loop(newNums)
 
-        | ClearNumbers -> let newNums = RandomNumbers[]
-                          communicator <! GameNums newNums
-                          if overDebug then consoleWriter <! cnslMsg "Clearing random numbers" ConsoleColor.DarkCyan
-                          return! loop(newNums)
+                            | RemoveNumber i -> let newNums = removeFromGameNumbers randomNumbers i
+                                                communicator <!& GameNums newNums
+                                                return! loop (newNums)
 
-        | AskForNumbers -> mailbox.Sender() <! GameNums randomNumbers
-                           return! loop(randomNumbers)
+                            | SendMeNumbers -> mailbox.Sender() <!& GameNums randomNumbers
+                                               return! loop(randomNumbers)
+
+                            | _ -> return! loop(randomNumbers)
+
+
+        | GameData (NewRandom i) -> let newNums = addToGameNumbers randomNumbers i
+                                    communicator <!& GameNums newNums
+                                    validator <!& GameNums newNums //Only needs to happen here as the list grows
+                                    return! loop (newNums)
+
+
 
         | _ -> return! loop (randomNumbers)
 
@@ -196,12 +182,12 @@ let randomHandler (mailbox: Actor<Msg>) =
     loop (RandomNumbers[])
 
 
-let clickedHandler (mailbox: Actor<Msg>) = //genAgent
+let clickedHandler (mailbox: Actor<Msg>) = 
 
         let consoleWriter = select "/user/consoleWriter" mailbox.Context.System
-        let communicator = select "/user/communicator"  mailbox.Context.System
-        let randomHandler = select "/user/randomHandler"  mailbox.Context.System
-        let validator = select "/user/validator"  mailbox.Context.System
+        let communicator = select "../communicator"  mailbox.Context
+        let randomHandler = select "../randomHandler"  mailbox.Context
+        let validator = select "../validator"  mailbox.Context
 
         consoleWriter <! cnslMsg "ClickedHandler created" ConsoleColor.Blue
 
@@ -209,17 +195,20 @@ let clickedHandler (mailbox: Actor<Msg>) = //genAgent
             let! msg = mailbox.Receive ()
 
             match msg with
-            | NewClickedNumber n -> let newNums = addToGameNumbers clickedNumbers n.number
-                                    if debug then consoleWriter <! cnslMsg (sprintf "You picked %i!" n.number) ConsoleColor.DarkMagenta
-                                    randomHandler <! RemoveNumber n
-                                    communicator <! GameNums newNums
-                                    validator <! GameNums newNums
-                                    return! loop (newNums)
+            | Instruction i -> match i with 
+                                    | NewClickedNumber n -> let newNums = addToGameNumbers clickedNumbers n.number
+                                                            if debug then consoleWriter <! cnslMsg (sprintf "You picked %i!" n.number) ConsoleColor.DarkMagenta
+                                                            randomHandler <!! RemoveNumber n
+                                                            communicator <!& GameNums newNums
+                                                            validator <!& GameNums newNums
+                                                            return! loop (newNums)
 
-            | ClearNumbers -> let newNums = ClickedNumbers[]
-                              communicator <! GameNums newNums
-                              if overDebug then consoleWriter <! cnslMsg "Clearing clicked numbers" ConsoleColor.DarkCyan
-                              return! loop(newNums)
+                                    | ClearNumbers -> let newNums = ClickedNumbers[]
+                                                      communicator <!& GameNums newNums
+                                                      if overDebug then consoleWriter <! cnslMsg "Clearing clicked numbers" ConsoleColor.DarkCyan
+                                                      return! loop(newNums)
+
+                                    | _ -> return! loop (clickedNumbers)
 
             | _ -> return! loop (clickedNumbers)
                 
@@ -236,23 +225,28 @@ let validator (mailbox: Actor<Msg>) =
 
         let! message = mailbox.Receive()
 
-        let clickedHandler = select "/user/clickedHandler"  mailbox.Context.System
-        let currentGame = select "/user/currentGame" mailbox.Context.System
+        let clickedHandler = select "../clickedHandler"  mailbox.Context
+        let currentGame = select "../currentGame" mailbox.Context
 
         match message with
-        | GameNums numbers ->     let (a,b) = getLengthAndSum numbers
-                                  match numbers with
-                                    | ClickedNumbers _ -> match (a,b) with
-                                                            | (x, _) when x > 5 -> currentGame <! Fail TooManyNumbers
-                                                            | (_,y) when y > 10 -> currentGame <! Fail OverTen
-                                                            | (_, 10) -> clickedHandler <! ClearNumbers
-                                                                         consoleWriter <! cnslMsg "You made 10!" ConsoleColor.Blue
-                                                                         currentGame <! IncrementScore 1
-                                                            | _ -> ()
+
+        | GameData d -> match d with
+                        | GameNums numbers ->
+                            let (a,b) = getLengthAndSum numbers
+                            match numbers with
+                            | ClickedNumbers _ -> match (a,b) with
+                                                    | (x, _) when x > 5 -> currentGame <!& Fail TooManyNumbers
+                                                    | (_,y) when y > 10 -> currentGame <!& Fail OverTen
+                                                    | (_, 10) -> clickedHandler <! Instruction ClearNumbers
+                                                                 consoleWriter <! cnslMsg "You made 10!" ConsoleColor.Blue
+                                                                 currentGame <!! IncrementScore 1
+                                                    | _ -> ()
                                           
-                                    | RandomNumbers _ -> match (a,b) with
-                                                            | (y,_) when y >  10 -> currentGame <! Fail TooManyNumbers
-                                                            | _ -> ()
+                            | RandomNumbers _ -> match (a,b) with
+                                                    | (y,_) when y >  10 -> currentGame <!& Fail TooManyNumbers
+                                                    | _ -> ()
+
+                        | _ -> ()
 
         | _ -> ()
         return! loop()
@@ -262,55 +256,67 @@ let validator (mailbox: Actor<Msg>) =
 
 let currentGame (mailbox: Actor<Msg>) =
 
-    let consoleWriter = select "/user/consoleWriter" mailbox.Context.System
-    let communicator = select "/user/communicator"  mailbox.Context.System
-    let scheduler = select "/user/scheduler"  mailbox.Context.System
-    let randomHandler = select "/user/randomHandler"  mailbox.Context.System 
-    let clickedHandler = select "/user/clickedHandler"  mailbox.Context.System
+    let consoleWriter = select "/user/consoleWriter" mailbox.Context
+    let communicator = select "../communicator"  mailbox.Context
+    let scheduler = select "../scheduler"  mailbox.Context
+    let randomHandler = select "../randomHandler"  mailbox.Context 
+    let clickedHandler = select "../clickedHandler"  mailbox.Context
+    let parentGame = select "../" mailbox.Context
 
-    let rec loop(currentGame:Game) = actor {
+    let rec loop(currentScore:Score) = actor {
 
         let! message = mailbox.Receive()
 
         match message with
-            | IncrementScore x -> let newGame = {currentGame with score = currentGame.score + x}
-                                  communicator <! GameUpdate newGame
-                                  return! loop(newGame)
 
-            | Fail f -> if debug then consoleWriter <! cnslMsg ("Fail message received!! - " + string f) ConsoleColor.Red 
-                        communicator <! f
-                        let newGame = {currentGame with cmd = GameCommand.Stop}
-                        communicator <! GameUpdate newGame
-                        scheduler <! StopRandom
-                        scheduler <! StopAuto
-                        randomHandler <! ClearNumbers
-                        clickedHandler <! ClearNumbers
-                        return! loop(newGame)
+            | Instruction i ->  if overDebug then consoleWriter <! cnslMsg (sprintf "Received Instruction - %s" (string i)) ConsoleColor.Green
+                                match i with
 
-            | ClearNumbers -> randomHandler <! ClearNumbers
-                              clickedHandler <! ClearNumbers
-                              if debug then consoleWriter <! cnslMsg "Clearing game numbers" ConsoleColor.Cyan
-                              return! loop(currentGame)
+                                | StartGame ->  consoleWriter <! cnslMsg "Start Game" ConsoleColor.Green
+                                                randomHandler <!! ClearNumbers
+                                                clickedHandler <!! ClearNumbers
+                                                return! loop(Score 0)
 
-            | Start ->  consoleWriter <! cnslMsg "Start Game" ConsoleColor.Green
-                        let newGame = {cmd = Continue; score = 0}
-                        return! loop(newGame)
+                                | RestartGame -> consoleWriter <! cnslMsg "Restart Game" ConsoleColor.Green
+                                                 randomHandler <!! ClearNumbers
+                                                 clickedHandler <!! ClearNumbers
+                                                 return! loop(Score 0)
 
-            | Restart -> consoleWriter <! cnslMsg "Restart Game" ConsoleColor.Green
-                         //randomHandler <! ClearNumbers
-                         //clickedHandler <! ClearNumbers
-                         let newGame = {cmd = Continue; score = 0}
-                         return! loop(newGame)
+                                | ClearNumbers -> randomHandler <!! ClearNumbers
+                                                  clickedHandler <!! ClearNumbers
+                                                  consoleWriter <! cnslMsg "Clearing game numbers" ConsoleColor.Cyan
+                                                  return! loop(currentScore)
 
-            | _ -> ()
+                                | IncrementScore x ->   let newScore = scoreValue currentScore + x
+                                                        if debug then communicator <! cnslMsg (sprintf "Current score :%i" newScore) ConsoleColor.DarkGreen
+                                                        let newGame = Score newScore
+                                                        communicator <!& ScoreUpdate newGame
+                                                        return! loop(newGame)
 
-        return! loop(currentGame)
+
+                                | _ -> return! loop(currentScore)
+
+
+            | GameData g -> if overDebug then consoleWriter <! cnslMsg (sprintf "Received Data - %s" (string g)) ConsoleColor.Green
+                            match g with
+                            | Fail f -> if debug then consoleWriter <! cnslMsg ("Fail message received!! - " + string f) ConsoleColor.Red 
+                                        communicator <!& Fail f
+                                        communicator <!! StopGame //StopGame of Reason?
+                                        scheduler <!! StopRandom
+                                        scheduler <!! StopAuto
+                                        parentGame <!& HighScore currentScore
+                                        return! loop(currentScore)
+
+                            | _ -> return! loop(currentScore)
+
+            | _ -> return! loop(currentScore)
+        
     }
-    loop({cmd = GameCommand.Continue; score = 0})
+    loop(Score 0)
 
 
 
-type autoSum = {indices: int list; sum:int}
+type AutoSum = {indices: int list; sum:int}
 
 let getSums (listIn:int list) =
 
@@ -330,10 +336,10 @@ let getSums (listIn:int list) =
 
 let automaticPlayer (mailbox: Actor<Msg>) =
 
-    let randomHandler = select "/user/randomHandler"  mailbox.Context.System
-    let clickedHandler = select "/user/clickedHandler"  mailbox.Context.System
-    let consoleWriter = select "/user/consoleWriter" mailbox.Context.System
-    let currentGame = select "/user/currentGame" mailbox.Context.System
+    let randomHandler = select "../randomHandler"  mailbox.Context
+    let clickedHandler = select "../clickedHandler"  mailbox.Context
+    let consoleWriter = select "/user/consoleWriter" mailbox.Context
+    let currentGame = select "../currentGame" mailbox.Context
 
     consoleWriter <! cnslMsg "Automatic player created" ConsoleColor.Blue
 
@@ -343,9 +349,12 @@ let automaticPlayer (mailbox: Actor<Msg>) =
         
         match message with
 
-        | Poke -> randomHandler <! AskForNumbers
+        | Instruction Poke -> randomHandler <!! SendMeNumbers
 
-        | GameNums numbers -> match numbers with
+        | GameData g -> match g with 
+
+                            | GameNums numbers ->
+                                match numbers with
                                 | ClickedNumbers _ -> ()
                                 | RandomNumbers n -> let myPairs = getSums n
                                                      if myPairs.Length > 0 then
@@ -359,23 +368,25 @@ let automaticPlayer (mailbox: Actor<Msg>) =
                                                                 consoleWriter <! cnslMsg (sprintf "Indices: %i %i" myPair.indices.[0] myPair.indices.[1]) ConsoleColor.Magenta
                                                         
                                                         let myFirstAutoclick = {number = n.[myPair.indices.[0]]; listIndex = myPair.indices.[0]}
-                                                        clickedHandler <! NewClickedNumber myFirstAutoclick
+                                                        clickedHandler <!! NewClickedNumber myFirstAutoclick
                                                         if overDebug then consoleWriter <! cnslMsg ("I picked the number " + string myFirstAutoclick.number) ConsoleColor.Magenta
 
                                                         let mySecondAutoclick = {number = n.[myPair.indices.[1]]; listIndex = myPair.indices.[1]-1} //The index is passed on so needs to subtract one, but the number itself isn't
-                                                        clickedHandler <! NewClickedNumber mySecondAutoclick
+                                                        clickedHandler <!! NewClickedNumber mySecondAutoclick
                                                         if overDebug then consoleWriter <! cnslMsg ("I picked the number " + string mySecondAutoclick.number) ConsoleColor.Magenta
-
 
                                                         if myPair.indices.Length = 3 then
                                                             let myThirdAutoclick = {number = n.[myPair.indices.[2]]; listIndex = myPair.indices.[2]-2} //The index is passed on so needs to subtract two, but the number itself isn't
-                                                            clickedHandler <! NewClickedNumber myThirdAutoclick
+                                                            clickedHandler <!! NewClickedNumber myThirdAutoclick
                                                             if overDebug then consoleWriter <! cnslMsg ("I picked the number " + string myThirdAutoclick.number) ConsoleColor.Magenta
+
                                                      else
                                                         consoleWriter <! cnslMsg ("Nothing to pick!") ConsoleColor.DarkMagenta
-                                                        if n.Length = 9 then
-                                                            consoleWriter <! cnslMsg ("Time to cheat... :-D") ConsoleColor.Red
-                                                            currentGame <! ClearNumbers
+                                                     if n.Length = 9 then
+                                                        consoleWriter <! cnslMsg ("Time to cheat... :-D") ConsoleColor.Red
+                                                        currentGame <!! ClearNumbers
+                            | _ -> ()
+
         | _ -> ()
         
         return! loop()
@@ -383,170 +394,167 @@ let automaticPlayer (mailbox: Actor<Msg>) =
     }
     loop()
 
-
-
-
-//let testActor inputFunction (mailbox: Actor<Msg>) =
-
-//    let consoleWriter = select "/user/consoleWriter" mailbox.Context.System
-
-//    let rec loop() = actor {
-
-//        let! message = mailbox.Receive()
-        
-//        match message with
-//        | GameNums numbers -> match numbers with
-//                                | RandomNumbers n -> consoleWriter <! (cnslMsg <| string (inputFunction n))
-//                                | ClickedNumbers n -> consoleWriter <! (cnslMsg <| string (n |> List.length))
-//        | _ -> ()
-        
-//        return! loop()
-
-//    }
-//    loop()
-
-
-//let gamesMaster (mailbox: Actor<ActorMessage>) =
-        
-//    let rec loop(currentGame:Game) = actor {
-
-//        let! message = mailbox.Receive()
-
-//        match message with
-//            | IncrementScore x -> let newGame = {currentGame with score = currentGame.score + x}
-//                                  return! loop(newGame)
-//            | Fail f -> match f with
-//                        | TooManyNumbers -> do (Channel.easySendMessage "message" "Failed - Too many numbers!") |> ignore
-//                        | OverTen -> do (Channel.easySendMessage "message" "Failed - Sum was too high!") |> ignore
-//                        let newGame = {currentGame with status = NotStarted}
-//                        return! loop(newGame)
-//            | _ -> ()
-
-//        return! loop(currentGame)
-//    }
-//    loop(initialGame)
-
-//Take all of the console messages and deal with them concurrently - it keeps the colours in check!
-let mailMan (mailbox: Actor<Msg>) =
+//Essentially functions as the Router
+let mailMan (socketId:Guid) (mailbox: Actor<Msg>) =
 
     let rec loop () = actor {
         let! message = mailbox.Receive ()
 
-        Console.WriteLine "Message Received by Mailman"
+        let consoleWriter = select "/user/consoleWriter" mailbox.Context
 
         match message with
-            | StartRandom -> select "/user/scheduler"  tensSystem <! message
-            | StopRandom -> select "/user/scheduler"  tensSystem <! message
-            | _ -> ()
+            //If we receive an Instruction (probably but not necessarily from Client-side) we need to re-route it.
+            | Instruction i ->  consoleWriter <! cnslMsg (sprintf "%s Instruction received by MailMan" (string i)) ConsoleColor.DarkRed
+                                match i with
+                                | StartGame -> select "../currentGame"  mailbox.Context <! message
+                                | RestartGame -> select "../currentGame"  mailbox.Context <! message
+                                | StopGame -> do Channel.harderSendMessage socketId "message" message (sprintf "Communications Error %s" (string i)) |> ignore
+
+                                | StartRandom -> select "../scheduler"  mailbox.Context <! message
+                                | StopRandom -> select "../scheduler"  mailbox.Context <! message
+                                | ClearNumbers -> select "../currentGame"  mailbox.Context <! message
+                                | NewClickedNumber _ -> select "../clickedHandler"  mailbox.Context <! message
+
+                                | SingleAuto -> select "../auto"  mailbox.Context <! (Instruction Poke)
+                                | StartAuto -> select "../scheduler"  mailbox.Context <! message
+                                | StopAuto -> select "../scheduler"  mailbox.Context <! message
+                                | _ -> ()
+
+            // If someone sends us data then we need to send it client-side as a Msg.
+            | GameData g -> consoleWriter <! cnslMsg (sprintf "%s GameData received by MailMan" (string g)) ConsoleColor.DarkRed
+                            //do Channel.easySendMessage "message" (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
+                            do Channel.harderSendMessage socketId "message" (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
+
+            | WriteToConsole _ -> consoleWriter <! message
 
         return! loop ()
     }
     loop ()
 
 
-let spawnActors =
-    spawn tensSystem "mailMan" mailMan |> ignore
-    spawn tensSystem "consoleWriter" consoleWriter |> ignore
-    spawn tensSystem "communicator" communicator |> ignore
-    spawn tensSystem "randomHandler" randomHandler  |> ignore
-    spawn tensSystem "scheduler" (scheduler) |> ignore
-    spawn tensSystem "clickedHandler" clickedHandler |> ignore
-    spawn tensSystem "randomGenerator" randomNumberGenerator |> ignore
-    spawn tensSystem "validator" validator |> ignore
-    spawn tensSystem "currentGame" currentGame |> ignore
-    spawn tensSystem "auto" automaticPlayer |> ignore
+//type Player =
+//    {
+//    socketId:Saturn.Channels.ISocketHub
+//    playerId:int
+//    playerName:string
+//    }
 
-let stopActors = tensSystem.Stop |> ignore
+let playerActor (playerSpec:Player) (mailbox : Actor<Msg>) =
 
+    Console.WriteLine "Player Created"
 
+    let communicator = spawn mailbox.Context "communicator" <| mailMan playerSpec.socketId.Value
+    spawn mailbox.Context "randomHandler" randomHandler  |> ignore
+    spawn mailbox.Context "scheduler" (scheduler) |> ignore
+    spawn mailbox.Context "clickedHandler" clickedHandler |> ignore
+    spawn mailbox.Context "randomGenerator" randomNumberGenerator |> ignore
+    spawn mailbox.Context "validator" validator |> ignore
+    spawn mailbox.Context "currentGame" currentGame |> ignore
+    spawn mailbox.Context "auto" automaticPlayer |> ignore
 
+    let rec loop (highScore:Score) = actor {
 
+        let! message = mailbox.Receive()
 
-let forwardMessageToActor next (ctx:HttpContext)= task {
-    let! request = ctx.BindModelAsync<Msg>()
-    Console.WriteLine "Message being forwarded..."
-    select "/user/mailMan"  tensSystem <! request
-    let reply = "Clicked number received"
-    return! json reply next ctx }
+        match message with
+        | GameData (HighScore h) -> if (scoreValue h) > (scoreValue highScore) then
+                                        communicator <! cnslMsg (sprintf "New high score of %i" (scoreValue h)) ConsoleColor.DarkGreen
+                                        return! loop(h)
+                                    else return! loop(highScore)
 
-
-
-let initialiseActors next (ctx:HttpContext) = task {
-    let reply = "Initialise actor system request received"
-    //stopActors
-    spawnActors
-    return! json reply next ctx }
-
-let startCounterActor next (ctx:HttpContext) = task {
-    select "/user/scheduler"  tensSystem <! StartRandom
-    let reply = "Start random number generation"
-    return! json reply next ctx }
-
-let stopCounterActor next (ctx:HttpContext) = task {
-    select "/user/scheduler"  tensSystem <! StopRandom
-    let reply = "Stop random number generation"
-    return! json reply next ctx }
-
-let clearNumbers next (ctx:HttpContext) = task {
-    let reply = "Clear numbers request received"
-    select "/user/currentGame"  tensSystem <! ClearNumbers
-    return! json reply next ctx }
-
-let updateClickedNumbers next (ctx:HttpContext)= task {
-    let! request = ctx.BindModelAsync<ClickedNumberIndex>()
-    select "/user/clickedHandler"  tensSystem <! NewClickedNumber request
-    let reply = "Clicked number received"
-    return! json reply next ctx }
-
-let startGame next (ctx:HttpContext) = task {
-    let reply = "Start request received"
-    select "/user/currentGame"  tensSystem <! Start
-    return! json reply next ctx }
+        | _ -> communicator <! message
+               return! loop(highScore)
+        
+    }
+    loop(Score 0)
 
 
-let restartGame next (ctx:HttpContext) = task {
-    let reply = "Restart request received"
-    select "/user/currentGame"  tensSystem <! Restart
-    return! json reply next ctx }
 
-let singleAuto next (ctx:HttpContext) = task {
-    let reply = "Do an auto pick"
-    select "/user/auto"  tensSystem <! Poke
-    return! json reply next ctx }
+let gamesMaster (mailbox: Actor<PlayerMessage>) =
+    let consoleWriter = select "/user/consoleWriter" mailbox.Context
 
+    consoleWriter <! cnslMsg "gamesMaster is created!" ConsoleColor.Magenta
 
-let startAutoPlayer next (ctx:HttpContext) = task {
-    select "/user/scheduler"  tensSystem <! StartAuto
-    let reply = "Start random number generation"
-    return! json reply next ctx }
+    let rec loop(players:Player list) = actor {
+    
+        let! message = mailbox.Receive()
 
-let stopAutoPlayer next (ctx:HttpContext) = task {
-    select "/user/scheduler"  tensSystem <! StopAuto
-    let reply = "Stop random number generation"
-    return! json reply next ctx }
+        if overDebug then consoleWriter <! cnslMsg "PlayerMessage Received!" ConsoleColor.Magenta
 
+        match message.msg with
 
-//let addTestActor inputFunction next (ctx:HttpContext) = task {
-//    let reply = "Test actor spawning"
-//    spawn tensSystem "testActor" (testActor inputFunction) |> ignore
-//    return! json reply next ctx }
+            | Instruction (NewPlayer n) -> let playerNumber = match players.Length with
+                                                                | 0 -> 1
+                                                                | _ -> (players |> List.map(fun x -> x.playerId.Value)
+                                                                                |> List.max) + 1
+
+                                           let updatedPlyr = {n with playerId = Some playerNumber}
+                                           let playerName = updatedPlyr.playerName.Value
+
+                                           consoleWriter <! cnslMsg ("Trying to spawn NewPlayer - " + playerName) ConsoleColor.Magenta
+
+                                           let newPlayerActor = spawn mailbox.Context.System playerName (playerActor message.plyr) //|> ignore
+                                           newPlayerActor <!& (SetPlayerId playerNumber)
+                                           consoleWriter <! cnslMsg ("New player registered - " + playerName + " - " + string playerNumber) ConsoleColor.Magenta
+
+                                           return! loop(players @ [updatedPlyr])
+
+            | _ ->  let getPlayer = players |> List.filter(fun x -> x.playerId = message.plyr.playerId)
+                                            |> List.tryExactlyOne
+                    
+                    match getPlayer with
+                    | Some p -> consoleWriter <! cnslMsg ("GamesMaster sending on message to " + string p) ConsoleColor.Blue
+                                select ("user/"+p.playerName.Value)  mailbox.Context.System  <! message.msg
+                                return! loop(players)
+
+                    | _ ->  consoleWriter <! cnslMsg ("That player was not found - " + string message.plyr) ConsoleColor.DarkRed
+                            return! loop(players)
+
+    }
+    loop([])
     
 
 
-//type injectedFunction = int list -> int
+let hubActor (hubIn:Channels.ISocketHub) (mailbox:Actor<PlayerMessage>) =
 
-//let injectedActor (tester:injectedFunction) (mailbox:Actor<int list>) =
+    let consoleWriter = select "/user/consoleWriter" mailbox.Context
 
-//    let rec loop () = actor {
-//        let! message = mailbox.Receive ()
+    consoleWriter <! cnslMsg "hubMaster is Live!!" ConsoleColor.DarkBlue
 
-//        let output = tester message
+    let rec loop() = actor {
+
+        let! message = mailbox.Receive()
+
+        let destP = message.plyr
+        let msg = message.msg
+
+        hubIn.SendMessageToClient "/channel" destP.socketId.Value "messages" msg |> ignore
+
+        return! loop()
+
+        }
+    loop()
 
 
-//        return! loop ()
-//    }
-//    loop ()
+let spawnActors = 
 
-//let getLength (x:int list) = x.Length
+    let actorSystem = System.create "tensSystem" <| Configuration.load()
 
-//let myTester = spawn tensSystem "test" <| injectedActor getLength
+    let consoleWriter = spawn actorSystem "consoleWriter" consoleWriter
+    consoleWriter <! cnslMsg "Called the spawnActors routine" ConsoleColor.DarkCyan
+
+    //spawn tensSystem "hubMaster" (hubActor hub) |> ignore
+
+    spawn actorSystem "gamesMaster" gamesMaster |> ignore
+    consoleWriter <! cnslMsg "Actors Spawning" ConsoleColor.DarkBlue
+
+    actorSystem
+
+
+
+
+
+
+
+
+

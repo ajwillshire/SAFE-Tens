@@ -7,7 +7,7 @@
     <ItemGroup>
         <None Include="paket.references" />
         <Compile Include="..\Shared\Shared.fs" />
-        <Compile Include="Router.fs" />
+        <Compile Include="Channel.fs" />
         <Compile Include="Actors.fs" />
         <Compile Include="Server.fs" />
     </ItemGroup>
