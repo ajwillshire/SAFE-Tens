@@ -13,10 +13,7 @@ module Channel =
     open Browser.WebSocket
     type ChannelMessage = { Topic : string; Payload : string }
 
-
     let inline decode<'a> x = x |> unbox<string> |> Decode.Auto.unsafeFromString<'a>
-
-
 
     let subscription _ =
         let sub dispatch =
@@ -32,8 +29,8 @@ module Channel =
                 let ws = WebSocket.Create(url)
                 ws.onmessage <- onWebSocketMessage
                 ws.onopen <- (fun ev ->
-                    printfn "WebSocket opened"
-                    dispatch (GameData (SetWebSocket ws)))
+                    printfn "WebSocket opened")
+                    //dispatch (GameData (SetWebSocket ws)))
                 ws.onclose <- (fun ev ->
                     printfn "WebSocket closed. Retrying connection"
                     promise { 
@@ -51,7 +48,8 @@ open Elmish.Debug
 open Elmish.HMR
 #endif
 
-Program.mkProgram Model.init Model.update View.render
+//Program.mkProgram Model.init Model.update View.render
+Program.mkProgram Model.init Model.update ViewFeliz.render
 |> Program.withSubscription Channel.subscription
 
 #if DEBUG

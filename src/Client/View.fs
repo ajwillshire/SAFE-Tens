@@ -42,29 +42,31 @@ let safeComponents =
 // ***********************************************
 
 
-let private button txt onClick =
+let private makeButton txt onClick =
     Button.button
         [ Button.IsFullWidth
           Button.Color IsPrimary
-          Button.OnClick onClick ]
+          Button.OnClick (onClick)]
         [ str txt ]
 
 
+//Helper functions for rendering elements
+let renderButton dispatchI index (number : int)   =
+    Html.button [
+        prop.style [ style.padding 20 ; style.fontSize 20 ]
+        prop.onClick (fun _ -> dispatchI (NewClickedNumber {number = number; listIndex = index}))
+        prop.text number
+    ]
+
+let clickedButtons index (number : int)   = 
+    Html.button [
+        prop.style [ style.padding 20 ; style.fontSize 20 ]
+        prop.text number
+    ] 
+
+
+
 let renderRunning(model : Running) (dispatchI : Instruction -> unit) =
-
-    //Helper functions for rendering elements
-    let renderButton dispatchI index (number : int)   =
-        Html.button [
-          prop.style [ style.padding 20 ; style.fontSize 20 ]
-          prop.onClick (fun _ -> dispatchI (NewClickedNumber {number = number; listIndex = index}))
-          prop.text number
-        ]
-
-    let clickedButtons index (number : int)   = 
-        Html.button [
-          prop.style [ style.padding 20 ; style.fontSize 20 ]
-          prop.text number
-        ] 
 
     //Get these elements ready for later use...
     let buttons = ForEachNumber(model.Numbers) (renderButton dispatchI)
@@ -85,28 +87,27 @@ let renderRunning(model : Running) (dispatchI : Instruction -> unit) =
                     [ Heading.h3 [] [ str ("Press buttons to start: ") ] ]
                 Columns.columns []
                     [
-                    Column.column [] [ button "Start Random" (fun _ -> dispatchI StartRandom) ]
-                    Column.column [] [ button "Stop Random" (fun _ -> dispatchI StopRandom) ]
-                    Column.column [] [ button "Clear" (fun _ -> dispatchI ClearNumbers) ]
+                    Column.column [] [ makeButton "Start Random" (fun _ -> dispatchI StartRandom) ]
+                    Column.column [] [ makeButton "Stop Random" (fun _ -> dispatchI StopRandom) ]
+                    Column.column [] [ makeButton "Clear" (fun _ -> dispatchI ClearNumbers) ]
                     ]
-                Columns.columns []
-                    [
-                    Column.column [] [ button "Single Auto" (fun _ -> dispatchI SingleAuto) ]
-                    Column.column [] [ button "Start Auto" (fun _ -> dispatchI StartAuto) ]
-                    Column.column [] [ button "Stop Auto" (fun _ -> dispatchI StopAuto) ]
-                    ]
+
+                if model.GameType = AdvancedGame then
+                    Columns.columns []
+                        [
+                        Column.column [] [ makeButton "Single Auto" (fun _ -> dispatchI SingleAuto) ]
+                        Column.column [] [ makeButton "Start Auto" (fun _ -> dispatchI StartAuto) ]
+                        Column.column [] [ makeButton "Stop Auto" (fun _ -> dispatchI StopAuto) ]
+                        ]
               ]
 
-          Html.div [
-             yield! buttons
-          ]
-          Html.div [
-             yield! clickedButtons
-          ]
+          Html.div [ yield! buttons ]
+          Html.div [ yield! clickedButtons ]
 
           Footer.footer [ ]
                 [ Content.content [ Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ]
-                    [ safeComponents ] ] ]
+                    [ safeComponents ] ]
+        ]
 
 
 
@@ -120,20 +121,31 @@ let private renderFinished points (dispatchI : Instruction -> unit) =
         ]
         Html.button [
             prop.style [ style.padding 20 ; style.fontSize 20 ]
-            prop.onClick (fun _ -> dispatchI RestartGame)
+            prop.onClick (fun _ -> dispatchI (StartGame SimpleGame))
             prop.text "Restart"
+        ]
+        Html.button [
+            prop.style [ style.padding 20 ; style.fontSize 20 ]
+            prop.onClick (fun _ -> dispatchI (StartGame AdvancedGame))
+            prop.text "Restart Advanced"
         ]
             ]
 
 
 let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
 
-    Html.button [
-        prop.style [ style.padding 20 ; style.fontSize 20 ]
-        prop.onClick (fun _ -> dispatchI StartGame)
-        prop.text "Start"
-      ]
-
+    Html.div [
+        Html.button [
+            prop.style [ style.padding 20 ; style.fontSize 20 ]
+            prop.onClick (fun _ -> dispatchI (StartGame SimpleGame))
+            prop.text "Start"
+          ]
+        Html.button [
+            prop.style [ style.padding 20 ; style.fontSize 20 ]
+            prop.onClick (fun _ -> dispatchI (StartGame AdvancedGame))
+            prop.text "Start Advanced"
+        ]
+    ]
 
 //Re-route to the three page layouts based on the Model state
 let render (game: Model) (dispatch: Msg -> unit) =

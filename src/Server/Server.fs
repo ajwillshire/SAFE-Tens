@@ -60,7 +60,7 @@ let mainChannel = channel {
         task {
             do! Task.Delay 500
             let m = (socketId |> (SetChannelSocketId >> GameData))
-            do! (harderSendMessage socketId "message" m "Problem sending SocketId")
+            do! (sendMessageViaHub socketId "message" m "Problem sending SocketId")
             } |> ignore
         return Channels.Ok })
 
@@ -88,6 +88,5 @@ let app = application {
     use_gzip
 
 }
-
 
 run app

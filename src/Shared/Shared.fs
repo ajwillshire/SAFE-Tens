@@ -6,18 +6,19 @@ module TensTypes =
 
     type Player =
         {
-        socketId:Option<Guid>
-        playerId:Option<int>
         playerName:Option<string>
-        playerWs:Option<WebSocket>
+        playerId:Option<int>
+        socketId:Option<Guid>
         }
+        //member this.systemName = playerName
 
+    type GameType =
+    | SimpleGame
+    | AdvancedGame
 
     type ClickedNumberIndex =
         { number: int
           listIndex : int}
-
-    //type Score = Score of int
 
     type msgAndColour =  {msg:string; colour:int}
 
@@ -25,8 +26,7 @@ module TensTypes =
             | Simple of string
             | Complex of msgAndColour
             | Error of exn
-
-    
+   
 
 module CommTypes =
 
@@ -45,9 +45,12 @@ module CommTypes =
         | RandomNumbers(data) -> RandomNumbers(data @ [newNum])
         | ClickedNumbers(data) -> ClickedNumbers(data @ [newNum])
 
+    type LengthAndSum = {length : int
+                         sum : int}
+
     let getLengthAndSum(input:GameNumbers) =
         match input with
-        | RandomNumbers(data) | ClickedNumbers(data)-> (data.Length), (data |> List.sum)
+        | RandomNumbers(data) | ClickedNumbers(data)-> data.Length, data |> List.sum
         
     let removeAtIndex index list =
         if index < (list |> List.length) then
@@ -73,9 +76,8 @@ module MessageTypes =
 
     type Instruction =
         | NewPlayer of Player
-        | NewGame
-        | StartGame
-        | RestartGame
+        | StartGame of GameType
+//        | RestartGame of GameType
         | StopGame //- Issued from the server to the client
         | StartRandom
         | StopRandom

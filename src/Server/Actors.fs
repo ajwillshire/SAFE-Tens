@@ -272,15 +272,15 @@ let currentGame (mailbox: Actor<Msg>) =
             | Instruction i ->  if overDebug then consoleWriter <! cnslMsg (sprintf "Received Instruction - %s" (string i)) ConsoleColor.Green
                                 match i with
 
-                                | StartGame ->  consoleWriter <! cnslMsg "Start Game" ConsoleColor.Green
-                                                randomHandler <!! ClearNumbers
-                                                clickedHandler <!! ClearNumbers
-                                                return! loop(Score 0)
+                                | StartGame t ->  consoleWriter <! cnslMsg "Start Game" ConsoleColor.Green
+                                                  randomHandler <!! ClearNumbers
+                                                  clickedHandler <!! ClearNumbers
+                                                  return! loop(Score 0)
 
-                                | RestartGame -> consoleWriter <! cnslMsg "Restart Game" ConsoleColor.Green
-                                                 randomHandler <!! ClearNumbers
-                                                 clickedHandler <!! ClearNumbers
-                                                 return! loop(Score 0)
+                                //| RestartGame -> consoleWriter <! cnslMsg "Restart Game" ConsoleColor.Green
+                                //                 randomHandler <!! ClearNumbers
+                                //                 clickedHandler <!! ClearNumbers
+                                //                 return! loop(Score 0)
 
                                 | ClearNumbers -> randomHandler <!! ClearNumbers
                                                   clickedHandler <!! ClearNumbers
@@ -406,9 +406,9 @@ let mailMan (socketId:Guid) (mailbox: Actor<Msg>) =
             //If we receive an Instruction (probably but not necessarily from Client-side) we need to re-route it.
             | Instruction i ->  consoleWriter <! cnslMsg (sprintf "%s Instruction received by MailMan" (string i)) ConsoleColor.DarkRed
                                 match i with
-                                | StartGame -> select "../currentGame"  mailbox.Context <! message
-                                | RestartGame -> select "../currentGame"  mailbox.Context <! message
-                                | StopGame -> do Channel.harderSendMessage socketId "message" message (sprintf "Communications Error %s" (string i)) |> ignore
+                                | StartGame _ -> select "../currentGame"  mailbox.Context <! message
+                                //| RestartGame -> select "../currentGame"  mailbox.Context <! message
+                                | StopGame -> do Channel.sendMessageViaHub socketId "message" message (sprintf "Communications Error %s" (string i)) |> ignore
 
                                 | StartRandom -> select "../scheduler"  mailbox.Context <! message
                                 | StopRandom -> select "../scheduler"  mailbox.Context <! message
@@ -422,8 +422,7 @@ let mailMan (socketId:Guid) (mailbox: Actor<Msg>) =
 
             // If someone sends us data then we need to send it client-side as a Msg.
             | GameData g -> consoleWriter <! cnslMsg (sprintf "%s GameData received by MailMan" (string g)) ConsoleColor.DarkRed
-                            //do Channel.easySendMessage "message" (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
-                            do Channel.harderSendMessage socketId "message" (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
+                            do Channel.sendMessageViaHub socketId "message" (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
 
             | WriteToConsole _ -> consoleWriter <! message
 
@@ -431,13 +430,6 @@ let mailMan (socketId:Guid) (mailbox: Actor<Msg>) =
     }
     loop ()
 
-
-//type Player =
-//    {
-//    socketId:Saturn.Channels.ISocketHub
-//    playerId:int
-//    playerName:string
-//    }
 
 let playerActor (playerSpec:Player) (mailbox : Actor<Msg>) =
 

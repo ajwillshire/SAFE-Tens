@@ -4,10 +4,11 @@ module Channel
     open FSharp.Control.Tasks.V2
     open System
     open Thoth.Json.Net
-
-    open Shared.MessageTypes
     open Microsoft.Extensions.Logging
 
+    open Shared.MessageTypes
+
+    
     let mutable webSocketHub: Option<Channels.ISocketHub> = None
 
     let sendMessage (hub:Channels.ISocketHub) socketId topic (payload:Msg) = task {
@@ -18,16 +19,7 @@ module Channel
         let message = Encode.Auto.toString(0, payload)
         do! hub.SendMessageToClients "/channel" topic message }
       
-    //let easySendMessage topic payload (onError:string) = task{
-    //    let socket = webSocketHub
-    //    let channelId = webSocketId
-
-    //    match (socket,channelId) with
-    //    | Some s, Some c -> sendMessage s c topic payload |> ignore
-    //    | _,_ -> Console.WriteLine onError
-    //}
-
-    let harderSendMessage (socketId:Guid) topic payload (onError:string) = task{
+    let sendMessageViaHub (socketId:Guid) topic payload (onError:string) = task{
         let hub = webSocketHub
 
         match (hub,socketId) with
