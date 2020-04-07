@@ -8,6 +8,7 @@
         <None Include="paket.references" />
         <Compile Include="..\Shared\Shared.fs" />
         <Compile Include="Channel.fs" />
+        <Compile Include="AutoPlayer.fs" />
         <Compile Include="Actors.fs" />
         <Compile Include="Server.fs" />
     </ItemGroup>

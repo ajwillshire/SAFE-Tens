@@ -12,7 +12,6 @@
         <Compile Include="Version.fs" />
         <Compile Include="Model.fs" />
         <Compile Include="ViewFeliz.fs" />
-        <Compile Include="View.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
     <ItemGroup>
@@ -20,6 +19,7 @@
       <PackageReference Include="Fable.Remoting.Client" Version="5.10.2" />
       <PackageReference Include="Feliz" Version="0.68.10" />
       <PackageReference Include="Feliz.Bulma" Version="1.13.0" />
+      <PackageReference Include="Feliz.Bulma.Checkradio" Version="1.0.0" />
       <PackageReference Include="Feliz.Bulma.QuickView" Version="1.0.1" />
       <PackageReference Include="Feliz.Recharts" Version="0.0.48" />
     </ItemGroup>

@@ -111,7 +111,7 @@ let renderRunning(model : Running) (dispatchI : Instruction -> unit) =
 
 
 
-let private renderFinished points (dispatchI : Instruction -> unit) =
+let private renderFinished (dispatchI : Instruction -> unit) =
 
     Html.div [
         Html.div [
@@ -145,6 +145,7 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
             prop.onClick (fun _ -> dispatchI (StartGame AdvancedGame))
             prop.text "Start Advanced"
         ]
+
     ]
 
 //Re-route to the three page layouts based on the Model state

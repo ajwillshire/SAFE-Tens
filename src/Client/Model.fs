@@ -16,40 +16,39 @@ type Running =
   {
     Clicked : GameNumbers
     Numbers : GameNumbers
-    Points : int
-    GameType: GameType
+    Points : Score
   }
+
+type GameOver =
+    {
+     finalScore:Score
+     failReason:FailMessage
+    }
 
 type ModelState =
     | NotStarted
     | Running of Running 
-    | Finished of int
+    | Finished of GameOver
 
-type Extras =
-    {
-     HighScore : int
-    }
+
+
 
 type Model =
     {
     Player : Player
     ModelState : ModelState
     ExtraData : Extras
-    //playerWs:Option<WebSocket>
+    ViewState : ViewState
     }
 
 let private withoutCommands model = model, Cmd.none
 
-
-let private noPlayer = {socketId = None; playerId = Some 0; playerName = None}
+let private noPlayer = {socketId = None; playerId = None; playerName = None}
 let private blankExtras = {HighScore = 0}
 
-let private newGame (model:Model) (gameType: GameType) = {model with ModelState = Running {Numbers = RandomNumbers []; Clicked = ClickedNumbers []; Points = 0; GameType = gameType}} //;
-                                     //Player = model.Player
-                                     //ExtraData = blankExtras
-                                     //playerWs = model.playerWs}
+let private newGame (model:Model) = {model with ModelState = Running {Numbers = RandomNumbers []; Clicked = ClickedNumbers []; Points = Score 0}} //;
 
-let initialModel = {ModelState = NotStarted; Player = noPlayer; ExtraData = blankExtras} //; playerWs = None}
+let initialModel = {ModelState = NotStarted; Player = noPlayer; ExtraData = blankExtras; ViewState = SimpleView} //; playerWs = None}
 
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> = initialModel, Cmd.none
@@ -61,16 +60,10 @@ let forwardToServer (game:Model) (msg:Msg) =    let pm = {msg = msg; plyr = game
                                                 game, cmd
 
 
-//let forwardToSocket (game:Model) (msg:Msg) = match game.playerWs with
-//                                                | Some s -> s.send (Thoth.Json.Encode.Auto.toString(0, {plyr = game.Player; msg = msg}))
-//                                                | None -> Console.WriteLine "No socket connection"
-//                                             withoutCommands game
-
 // The update function computes the next state of the application based on the current state and the incoming events/messages
 // It can also run side-effects (encoded as commands) like calling the server via Http.
 // these commands in turn, can dispatch messages to which the update function will react.
 let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
-
 
     match game.ModelState, msg with
        
@@ -84,45 +77,29 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
 
     | state, Instruction message -> 
         match state, message with
+        
+                | NotStarted, UpdatePlayerName s ->
+                    withoutCommands <| {game with Player = {game.Player with playerName = Some s}}
 
-                | NotStarted, NewPlayer _ -> forwardToServer (game) msg
+                | _, StartGame ->
+                    forwardToServer (newGame game) msg
 
-                | NotStarted, StartGame t ->
-                    //forwardToServer (newGame game) msg
-                    forwardToServer (newGame game t) msg
+                | _, ChangeView v ->
+                    withoutCommands <| {game with ViewState = v}
 
-                | Finished _, StartGame t ->
-                    //forwardToServer (newGame game) msg
-                    forwardToServer (newGame game t) msg                    
-
-
-                // This command will probably come from the Server upon failure
-                | Running state, StopGame ->
-                    withoutCommands <| {game with ModelState = Finished state.Points}
-
-                //All other commands get sent to the Server
-                | Running _, _ -> forwardToServer game msg
-
-                //| Finished _, RestartGame ->
-                //    forwardToServer (newGame game) msg
-
-                | _ -> withoutCommands <| game
+                //All other Running commands get sent to the Server
+                | _, _ -> forwardToServer game msg
 
     | state, GameData message ->
         Console.WriteLine (sprintf "GameData Message Received %s" (string message))
         match state, message with
-                | _, SetChannelSocketId g ->
-                    let cmd1 = Cmd.ofMsg (("Channel socket Id is " + string g) |> (Simple >> WriteToConsole))
-                    let shortName = "Henry-" + ((string g).[0..4])
-                    let newPlayer = {socketId = Some g; playerName = Some shortName; playerId = None} //Will get the playerId from the Server in due course
-                    let cmd2 = Cmd.ofMsg(Instruction <| NewPlayer newPlayer)
-                    let cmds = Cmd.batch([cmd1; cmd2])
-                    {game with Player = newPlayer}, cmds
 
-                //| _, SetWebSocket w ->
-                //     let updatedGame = {game with playerWs = Some w}
-                //     Console.WriteLine "Websocket stored"
-                //     withoutCommands updatedGame
+                | _, SetChannelSocketId g ->
+                    let newPlayer = {game.Player with socketId = Some g} //Will get the playerId from the Server in due course
+
+                    let cmd1 = Cmd.ofMsg (("Channel socket Id is " + string g) |> (Simple >> WriteToConsole))
+                    //let cmd2 = Cmd.ofMsg(Instruction <| NewPlayer newPlayer)
+                    {game with Player = newPlayer}, cmd1 //Cmd.batch([cmd1; cmd2])
 
                 | _, SetPlayerId i ->
                     let newGame = {game with Player = {game.Player with playerId = Some i}}
@@ -134,13 +111,15 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                     | ClickedNumbers _ -> withoutCommands <| {game with ModelState = Running {state with Clicked = ints}}
 
                 | Running state, ScoreUpdate p ->
-                    Console.WriteLine (sprintf "Score received - %i" (scoreValue p))
-                    withoutCommands <| {game with ModelState = Running {state with Points = scoreValue p}}
+                    Console.WriteLine (sprintf "Score received - %i" (getScoreValue p))
+                    withoutCommands <| {game with ModelState = Running {state with Points = p}}
 
-                | Running _, Fail f ->
+                | Running state, Fail f ->
+                    let finishedGame = {game with ModelState = Finished {finalScore= state.Points; failReason = f}}
                     match f with
-                    | TooManyNumbers -> game, Cmd.ofMsg("Too many numbers in random set." |> (Simple >> WriteToConsole))
-                    | OverTen -> game, Cmd.ofMsg("The sum of total clicked numbers exceeded ten." |> (Simple >> WriteToConsole))
+                    | TooManyNumbers -> finishedGame, Cmd.ofMsg("Too many numbers in random set." |> (Simple >> WriteToConsole))
+                    | OverTen -> finishedGame, Cmd.ofMsg("The sum of total clicked numbers exceeded ten." |> (Simple >> WriteToConsole))
+                    | HardStop p -> finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by %s" p.playerName.Value) |> (Simple >> WriteToConsole))
 
                 | _ -> withoutCommands <| game
 

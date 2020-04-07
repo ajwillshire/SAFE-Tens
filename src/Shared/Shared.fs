@@ -4,17 +4,53 @@ open Browser.Types
 
 module TensTypes =
 
+    type Score = Score of int
+
+    let getScoreValue(Score i) = i
+
+
+    type PlayerId = PlayerId of int option
+
+    let setPlayerId i = PlayerId (Some i)
+    let getPlayerId (PlayerId i) = match i with
+                                        | Some x -> x
+                                        | None -> -1
+
+
+    type PlayerName = PlayerName of string option
+
+    let setPlayerName s = PlayerName (Some s)
+    let getPlayerName (PlayerName n) = match n with
+                                        | Some s -> s
+                                        | None -> ""
+
+    type SocketID = SocketID of Guid
+
+    let setSocketID s = SocketID s
+    let getSocketID (SocketID n) = n
+
+
     type Player =
         {
         playerName:Option<string>
         playerId:Option<int>
-        socketId:Option<Guid>
+        socketId:Option<SocketID>
         }
-        //member this.systemName = playerName
 
-    type GameType =
-    | SimpleGame
-    | AdvancedGame
+    type Extras =
+        {
+         HighScore : int
+        }
+
+    type GameConfig =
+        {
+         targetValue:int
+         maxAllowableClicked:int
+        }
+
+    type ViewState =
+    | SimpleView
+    | AdvancedView
 
     type ClickedNumberIndex =
         { number: int
@@ -76,9 +112,9 @@ module MessageTypes =
 
     type Instruction =
         | NewPlayer of Player
-        | StartGame of GameType
-//        | RestartGame of GameType
-        | StopGame //- Issued from the server to the client
+        | UpdatePlayerName of string
+        | DeleteAllOtherPlayers of Player
+        | StartGame
         | StartRandom
         | StopRandom
         | NewClickedNumber of ClickedNumberIndex
@@ -90,22 +126,22 @@ module MessageTypes =
         | IncrementScore of int //Internal (Server)
         | SendMeNumbers //Internal (Server)
         | Poke //Internal (Server)
+        | ChangeView of ViewState
 
 
     type FailMessage =
         | TooManyNumbers //From RandomHandler
         | OverTen //From ClickedHandler
+        | HardStop of Player //From User interface
 
-    type Score = Score of int
 
-    let scoreValue(Score i) = i
 
 
     type GameData =
         | GameNums of GameNumbers
         | ScoreUpdate of Score
         | HighScore of Score
-        | SetChannelSocketId of Guid
+        | SetChannelSocketId of SocketID
         | SetWebSocket of WebSocket
         | SetPlayerId of int
         | Fail of FailMessage // Internal (Server)
@@ -118,14 +154,13 @@ module MessageTypes =
         | GameData of GameData
         | WriteToConsole of ConsoleMessage
 
-
     type PlayerMessage =
-        {msg : Msg
-         plyr: Player}
+            {msg : Msg
+             plyr: Player}
 
 
 
-
+              
 
 
 

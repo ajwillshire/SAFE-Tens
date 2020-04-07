@@ -1,23 +1,21 @@
-open System.IO
-open Saturn
-open Actors
-open Giraffe.Core
-open Microsoft.AspNetCore.Http
-open System.Threading.Tasks
-open FSharp.Control.Tasks.V2
 open System
-
-open Shared.MessageTypes
+open System.IO
+open System.Threading.Tasks
 open Microsoft.Extensions.Logging
 open Microsoft.FSharp.Core.Operators
+open FSharp.Control.Tasks.V2
+open Microsoft.AspNetCore.Http
+
 open Giraffe
-open Akka.FSharp
-open Akka.Actor
+open Saturn
 open Thoth.Json.Net
+open Akka.FSharp
+
 open Shared
+open MessageTypes
 open TensTypes
 open Channel
-open Microsoft.Extensions.Configuration
+open Actors
 
 
 let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" -> None | x -> Some x
@@ -59,7 +57,7 @@ let mainChannel = channel {
 
         task {
             do! Task.Delay 500
-            let m = (socketId |> (SetChannelSocketId >> GameData))
+            let m = (SocketID socketId |> (SetChannelSocketId >> GameData))
             do! (sendMessageViaHub socketId "message" m "Problem sending SocketId")
             } |> ignore
         return Channels.Ok })

@@ -19,7 +19,6 @@ module Channel =
         let sub dispatch =
             let onWebSocketMessage (msg:MessageEvent) =
                 let msg = msg.data |> decode<ChannelMessage>
-                //printfn "WebSocket message received: %A" msg
                 match msg.Topic with
                 | "message" -> msg.Payload |> decode<Msg> |> dispatch
                 | _ -> ()
@@ -30,7 +29,6 @@ module Channel =
                 ws.onmessage <- onWebSocketMessage
                 ws.onopen <- (fun ev ->
                     printfn "WebSocket opened")
-                    //dispatch (GameData (SetWebSocket ws)))
                 ws.onclose <- (fun ev ->
                     printfn "WebSocket closed. Retrying connection"
                     promise { 
