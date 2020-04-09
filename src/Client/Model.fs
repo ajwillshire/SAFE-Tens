@@ -23,6 +23,7 @@ type GameOver =
     {
      finalScore:Score
      failReason:FailMessage
+     culprit:Player option
     }
 
 type ModelState =
@@ -53,7 +54,7 @@ let initialModel = {ModelState = NotStarted; Player = noPlayer; ExtraData = blan
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> = initialModel, Cmd.none
 
-let forwardToServer (game:Model) (msg:Msg) =    let pm = {msg = msg; plyr = game.Player}
+let forwardToServer (game:Model) (msg:Msg) =    let pm = PlayerMessage {msg = msg; plyr = game.Player}
                                                 let cmd = Cmd.OfPromise.either (fun () -> Fetch.post ("/api/messages", pm)) () //Thing to do
                                                                                (fun(m) -> m)                                    //Message if it succeeds
                                                                                (fun(e) -> (Error >> WriteToConsole) e)          //Message if it fails
@@ -87,6 +88,10 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                 | _, ChangeView v ->
                     withoutCommands <| {game with ViewState = v}
 
+                | _, NewPlayer p ->
+                    Console.WriteLine "Sending NewPlayer command..."
+                    forwardToServer game msg
+
                 //All other Running commands get sent to the Server
                 | _, _ -> forwardToServer game msg
 
@@ -115,12 +120,25 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                     withoutCommands <| {game with ModelState = Running {state with Points = p}}
 
                 | Running state, Fail f ->
-                    let finishedGame = {game with ModelState = Finished {finalScore= state.Points; failReason = f}}
+                    let finishedGame = {game with ModelState = Finished {finalScore= state.Points; failReason = f; culprit = None}}
                     match f with
                     | TooManyNumbers -> finishedGame, Cmd.ofMsg("Too many numbers in random set." |> (Simple >> WriteToConsole))
                     | OverTen -> finishedGame, Cmd.ofMsg("The sum of total clicked numbers exceeded ten." |> (Simple >> WriteToConsole))
-                    | HardStop p -> finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by %s" p.playerName.Value) |> (Simple >> WriteToConsole))
+                    | HardStop -> finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by someone.") |> (Simple >> WriteToConsole))
 
                 | _ -> withoutCommands <| game
+
+    | Running state, PlayerMessage pm ->    Console.WriteLine "PlayerMessage received! (Probably a fail)"
+                                            match pm.msg with
+                                            | GameData g -> match g with
+                                                            | Fail (HardStop) -> let finishedGame = {game with ModelState = Finished {finalScore= state.Points; failReason = HardStop; culprit = Some pm.plyr}}
+                                                                                 finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by %s" pm.plyr.playerName.Value) |> (Simple >> WriteToConsole))
+                                                            | _ -> withoutCommands <| game
+                                            | _ -> withoutCommands <| game
+
+
+
+
+     | _ ->    withoutCommands <| game
 
 

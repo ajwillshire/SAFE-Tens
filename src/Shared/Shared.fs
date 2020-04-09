@@ -132,7 +132,7 @@ module MessageTypes =
     type FailMessage =
         | TooManyNumbers //From RandomHandler
         | OverTen //From ClickedHandler
-        | HardStop of Player //From User interface
+        | HardStop //of Player //From User interface
 
 
 
@@ -153,8 +153,9 @@ module MessageTypes =
         | Instruction of Instruction
         | GameData of GameData
         | WriteToConsole of ConsoleMessage
+        | PlayerMessage of PlayerMessage
 
-    type PlayerMessage =
+    and PlayerMessage =
             {msg : Msg
              plyr: Player}
 

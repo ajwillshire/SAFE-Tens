@@ -126,16 +126,13 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
                         prop.text "Press buttons to start: "
                     ]
                 ]
-
             ]
 
             Html.div[
                 Bulma.field [
                     prop.style[style.padding 30; style.outlineColor color.darkSlateBlue; style.outlineWidth 2; style.outlineStyle.double]
                     prop.children[
-
                         Html.div[
-                
                             Checkradio.radio [
                                prop.style[style.padding 10]
                                prop.id "myradio1"
@@ -143,12 +140,9 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
                                prop.onCheckedChange (fun _ -> dispatchI (ChangeView SimpleView))
                                prop.isChecked (game.ViewState = SimpleView)
                                prop.key "SimpleCR"
-                               
                             ]
-
                             Html.label [ prop.htmlFor "myradio1"; prop.text "Simple View"; prop.style[style.padding 15; style.paddingRight 10]]
                         ]
-
                         Html.div[
                             Checkradio.radio [
                                prop.style[style.padding 10]
@@ -158,27 +152,23 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
                                prop.isChecked (game.ViewState = AdvancedView)
                                prop.key "AdvancedCR"
                             ]
-
                             Html.label [ prop.htmlFor "myradio2"; prop.text "Advanced View"; prop.style[style.padding 15; style.paddingRight 10]]
                         ]
                     ]
                 ]
 
-
                 Html.div[
                     prop.style[style.margin 30]
                     prop.children[
                         Bulma.columns [
-                            prop.style[style.minHeight 50; style.flexShrink 10; style.flexDirection.row]
                             column.is3
+                            prop.style[style.minHeight 50; style.flexShrink 10; style.flexDirection.row]
                             prop.children [
                                 makeButton "Start Random" (fun _ -> dispatchI StartRandom)
                                 makeButton "Stop Random" (fun _ -> dispatchI StopRandom)
                                 makeButton "Clear" (fun _ -> dispatchI ClearNumbers)
                             ]
-
                         ]
-                
 
                         if game.ViewState = AdvancedView then
                             Html.h2 [
@@ -197,20 +187,21 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
                     ]
                 ]
 
-                Html.div [ prop.style [ style.padding 20 ]
-                           prop.children [
-                                Html.div [
-                                    prop.children[ yield! buttons ]
-                                    prop.style [ style.minHeight 50]
-                                ]
+                Html.div [
+                    prop.style [ style.padding 20 ]
+                    prop.children [
+                        Html.div [
+                            prop.children[ yield! buttons ]
+                            prop.style [ style.minHeight 50]
+                        ]
                                                  
-                                Html.div [prop.style [style.padding 10]]
+                        Html.div [prop.style [style.padding 10]]
 
-                                Html.div [
-                                    prop.children [ yield! clickedButtons ]
-                                    prop.style [ style.minHeight 50]
-                                ]
-                           ]       
+                        Html.div [
+                            prop.children [ yield! clickedButtons ]
+                            prop.style [ style.minHeight 50]
+                        ]
+                    ]       
                 ]
 
                 Bulma.footer [
@@ -220,7 +211,7 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
         
             ]
         ]
-        ]
+]
 
 
 let private renderFinished gameOver (dispatchI : Instruction -> unit) =
@@ -234,7 +225,9 @@ let private renderFinished gameOver (dispatchI : Instruction -> unit) =
             Html.h2 (sprintf "Reason for failure: %s" (match gameOver.failReason with
                                                                             | FailMessage.OverTen -> "Those numbers exceeded 10"
                                                                             | FailMessage.TooManyNumbers -> "There were just too many numbers!"
-                                                                            | FailMessage.HardStop p -> sprintf "%s pulled the plug on your game!" p.playerName.Value
+                                                                            | FailMessage.HardStop -> match gameOver.culprit with
+                                                                                                        | Some p -> sprintf "%s pulled the plug on your game!" p.playerName.Value
+                                                                                                        | None -> "An unknown person pulled the plug on your game"
                                                                             ))
             Html.h2 [prop.style [ style.padding 40 ]]
 
