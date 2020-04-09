@@ -15,8 +15,6 @@ open AutoPlayer
 let debug = true
 let overDebug = true
 
-
-
 let private random = System.Random()
 
 //Add an operator to allow sending a PoisonPill
@@ -287,7 +285,7 @@ let currentGame (mailbox: Actor<Msg>) =
     let scheduler = select "../scheduler"  mailbox.Context
     let randomHandler = select "../randomHandler"  mailbox.Context 
     let clickedHandler = select "../clickedHandler"  mailbox.Context
-    let parentGame = select "../" mailbox.Context
+    let myPlayer = select "../" mailbox.Context
 
     let rec loop(currentScore:Score) = actor {
 
@@ -321,7 +319,10 @@ let currentGame (mailbox: Actor<Msg>) =
                                         mailMan <!& Fail f
                                         scheduler <!! StopRandom
                                         scheduler <!! StopAuto
-                                        parentGame <!& HighScore currentScore
+                                        myPlayer <!& HighScore currentScore
+
+                                        if f = HardStop then myPlayer <!! KillMeNow //Changed from mailman...
+
                                         return! loop(currentScore)
 
                             | _ -> return! loop(currentScore)
@@ -355,6 +356,7 @@ let mailMan (player:Player) (mailbox: Actor<Msg>) =
                                 | SingleAuto -> select "../auto"  mailbox.Context <! (Instruction Poke)
                                 | StartAuto -> select "../scheduler"  mailbox.Context <! message
                                 | StopAuto -> select "../scheduler"  mailbox.Context <! message
+
                                 | _ -> ()
 
             // If someone sends us data then we need to send it client-side as a Msg.
@@ -364,7 +366,7 @@ let mailMan (player:Player) (mailbox: Actor<Msg>) =
             | WriteToConsole m -> consoleWriter <!% {plyr = player; msg = WriteToConsole m}
 
             | PlayerMessage pm ->   do Channel.sendMessageViaHub (getSocketID player.socketId.Value) "message" message (sprintf "Communications Error %s" (string pm)) |> ignore
-                                    consoleWriter <!% {plyr = player; msg = cnslMsg (sprintf "MailMan has received message from another player %s" pm.plyr.playerName.Value) ConsoleColor.Blue}
+                                    consoleWriter <!% {plyr = player; msg = cnslMsg (sprintf "MailMan has received message from %s" pm.plyr.playerName.Value) ConsoleColor.Blue}
                                     match pm.msg with
                                     | GameData g -> match g with
                                                     | Fail (HardStop) -> select "../currentGame"  mailbox.Context <!& g
@@ -403,6 +405,8 @@ let playerActor (playerSpec:Player) (mailbox : Actor<Msg>) =
                                         return! loop(h)
                                     else return! loop(highScore)
 
+        | Instruction KillMeNow -> gamesMaster <!% {plyr = playerSpec; msg = message}
+
         | _ -> mailMan <! message
                return! loop(highScore)
         
@@ -415,7 +419,6 @@ type ScoreLog = {playerName:string; highScore: Score}
 let gamesMaster (mailbox: Actor<Msg>) =
 
     let gamesMasterPersona = {playerName = Some "GamesMaster"; playerId = Some 0; socketId = None}
-
 
     let consoleWriter = select "/user/consoleWriter" mailbox.Context
     consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg "The GamesMaster is Alive!!" ConsoleColor.Magenta}
@@ -458,11 +461,13 @@ let gamesMaster (mailbox: Actor<Msg>) =
                 | Instruction (DeleteAllOtherPlayers p) -> players
                                                              |> List.filter (fun x -> x.playerName <> p.playerName)
                                                              |> List.iter (fun q -> let player = (select ("user/"+q.playerName.Value) mailbox.Context.System)
-                                                                                    //player <!& (Fail (HardStop p))
                                                                                     player <!% {plyr = p; msg = GameData (Fail HardStop)}
-                                                                                    player <!!! PoisonPill.Instance)
+                                                                                    )//player <!!! PoisonPill.Instance)
                                                            consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg ("All other players deleted!!") ConsoleColor.Red}
                                                            return! loop ([p],highScores)
+
+                | Instruction KillMeNow -> (select ("user/"+m.plyr.playerName.Value) mailbox.Context.System) <!!! PoisonPill.Instance
+                                           return! loop (players, highScores)
 
                 | GameData (HighScore h) -> let newHighScores = ([{playerName = m.plyr.playerName.Value; highScore = h}] @ highScores)
                                                                 |> List.sortByDescending(fun a -> a.highScore)

@@ -114,6 +114,7 @@ module MessageTypes =
         | NewPlayer of Player
         | UpdatePlayerName of string
         | DeleteAllOtherPlayers of Player
+        | KillMeNow
         | StartGame
         | StartRandom
         | StopRandom
