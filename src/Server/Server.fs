@@ -15,7 +15,7 @@ open Shared
 open MessageTypes
 open TensTypes
 open Channel
-open Actors
+open ActorManagement
 
 
 let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" -> None | x -> Some x
