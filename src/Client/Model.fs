@@ -44,7 +44,7 @@ type Model =
 
 let private withoutCommands model = model, Cmd.none
 
-let private noPlayer = {socketId = None; playerId = None; playerName = None}
+let private noPlayer = {socketId = SocketID Guid.Empty; playerId = PlayerId None; playerName = PlayerName None}
 let private blankExtras = {HighScore = 0}
 
 let private newGame (model:Model) = {model with ModelState = Running {Numbers = RandomNumbers []; Clicked = ClickedNumbers []; Points = Score 0}} //;
@@ -80,7 +80,7 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
         match state, message with
         
                 | NotStarted, UpdatePlayerName s ->
-                    withoutCommands <| {game with Player = {game.Player with playerName = Some s}}
+                    withoutCommands <| {game with Player = {game.Player with playerName = setPlayerName(s)}}
 
                 | _, StartGame ->
                     forwardToServer (newGame game) msg
@@ -100,14 +100,12 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
         match state, message with
 
                 | _, SetChannelSocketId g ->
-                    let newPlayer = {game.Player with socketId = Some g} //Will get the playerId from the Server in due course
-
+                    let newPlayer = {game.Player with socketId = g} //Will get the playerId from the Server in due course
                     let cmd1 = Cmd.ofMsg (("Channel socket Id is " + string g) |> (Simple >> WriteToConsole))
-                    //let cmd2 = Cmd.ofMsg(Instruction <| NewPlayer newPlayer)
-                    {game with Player = newPlayer}, cmd1 //Cmd.batch([cmd1; cmd2])
+                    {game with Player = newPlayer}, cmd1 
 
                 | _, SetPlayerId i ->
-                    let newGame = {game with Player = {game.Player with playerId = Some i}}
+                    let newGame = {game with Player = {game.Player with playerId = setPlayerId i}}
                     withoutCommands newGame
 
                 | Running state, GameNums ints ->
@@ -132,7 +130,7 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                                             match pm.msg with
                                             | GameData g -> match g with
                                                             | Fail (HardStop) -> let finishedGame = {game with ModelState = Finished {finalScore= state.Points; failReason = HardStop; culprit = Some pm.plyr}}
-                                                                                 finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by %s" pm.plyr.playerName.Value) |> (Simple >> WriteToConsole))
+                                                                                 finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by %s" (getPlayerName pm.plyr.playerName)) |> (Simple >> WriteToConsole))
                                                             | _ -> withoutCommands <| game
                                             | _ -> withoutCommands <| game
 

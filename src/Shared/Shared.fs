@@ -12,9 +12,7 @@ module TensTypes =
     type PlayerId = PlayerId of int option
 
     let setPlayerId i = PlayerId (Some i)
-    let getPlayerId (PlayerId i) = match i with
-                                        | Some x -> x
-                                        | None -> -1
+    let getPlayerId (PlayerId i) = i
 
 
     type PlayerName = PlayerName of string option
@@ -24,6 +22,8 @@ module TensTypes =
                                         | Some s -> s
                                         | None -> ""
 
+    let getSafePlayerName p = (getPlayerName p).Replace(" ", "_")
+
     type SocketID = SocketID of Guid
 
     let setSocketID s = SocketID s
@@ -32,9 +32,9 @@ module TensTypes =
 
     type Player =
         {
-        playerName:Option<string>
-        playerId:Option<int>
-        socketId:Option<SocketID>
+        playerName:PlayerName
+        playerId:PlayerId
+        socketId:SocketID
         }
 
     type Extras =

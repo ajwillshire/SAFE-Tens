@@ -91,9 +91,11 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
     let clickedButtons = ForEachNumber(model.Clicked) (clickedButtons)
 
     let scoreBar = "SAFE Tens - Score:" + string model.Points
-    let playerDetails = match player.playerName with
-                            | Some n -> "Player Name: " + n
-                            | _ -> "Unknown Player!"
+
+    let playerDetails = match getPlayerName player.playerName with
+                            | "" -> "Unknown Player!"
+                            | n -> "Player Name: " + n
+
 
 
     //Here's what will be the page layout and what is returned from the function
@@ -226,7 +228,7 @@ let private renderFinished gameOver (dispatchI : Instruction -> unit) =
                                                                             | FailMessage.OverTen -> "Those numbers exceeded 10"
                                                                             | FailMessage.TooManyNumbers -> "There were just too many numbers!"
                                                                             | FailMessage.HardStop -> match gameOver.culprit with
-                                                                                                        | Some p -> sprintf "%s pulled the plug on your game!" p.playerName.Value
+                                                                                                        | Some p -> sprintf "%s pulled the plug on your game!" (getPlayerName p.playerName)
                                                                                                         | None -> "An unknown person pulled the plug on your game"
                                                                             ))
             Html.h2 [prop.style [ style.padding 40 ]]
@@ -272,9 +274,7 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
 
             Bulma.textInput [
                 prop.style[]
-                prop.valueOrDefault (match state.Player.playerName with
-                                      | Some s -> s
-                                      | None -> "")
+                prop.valueOrDefault (getPlayerName state.Player.playerName)
 
                 prop.onChange(UpdatePlayerName >> dispatchI)
 
@@ -282,8 +282,8 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
 
             Html.h2 [prop.style [ style.padding 20 ]]
 
-            match state.Player.playerName with
-            | Some "" | None -> ()
+            match getPlayerName state.Player.playerName with
+            | "" -> ()
             | _ ->
                 Bulma.button [
                     prop.style[]
@@ -291,8 +291,8 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                     prop.text "Create player"
                 ]
 
-            match state.Player.playerId with
-                | None -> ()
+            match getPlayerId state.Player.playerId with
+                | None -> () //If playerId is none, it returns -1
                 | _ ->
 
                     Html.h2 [prop.style [ style.padding 40 ]]
