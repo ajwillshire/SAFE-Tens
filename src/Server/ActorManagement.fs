@@ -15,26 +15,6 @@ open PlayerActors
 let debug = true
 let overDebug = true
 
-////Add an operator to allow sending a PoisonPill
-//let private (<!!!) a (b:PoisonPill) = a <! b
-
-////Overload <! to ensure that only a Msg can be sent using <! (except for the exception above!)
-//let private (<!) a (b:Msg) = a<!b
-
-////Add a new operator to make it simpler to pass instructions around the place - Msg | Instruction
-//let private (<!!) a (b:Instruction) = a <! (Instruction b)
-
-////Add a new operator to make it simpler to pass data around the place - Msg | GameData
-//let private (<!&) a (b:GameData) = a <! (GameData b)
-
-////Add a new operator to make it simpler to pass data around the place - Msg | GameData
-//let private (<!%) a (b:PlayerMessage) = a <! (PlayerMessage b)
-
-//Helper function to make it easier to send messages to the console
-//let private cnslMsg m c = WriteToConsole ({msg = m; colour = int c} |> Complex)
-
-
-
 //Take all of the console messages and deal with them concurrently - it keeps the colours in check!
 let consoleWriter (mailbox: Actor<Msg>) =
 
