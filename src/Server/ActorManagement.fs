@@ -8,29 +8,30 @@ open Akka.Actor
 open Shared
 open TensTypes
 open MessageTypes
-
+open Operators
 open PlayerActors
+
 
 let debug = true
 let overDebug = true
 
-//Add an operator to allow sending a PoisonPill
-let private (<!!!) a (b:PoisonPill) = a <! b
+////Add an operator to allow sending a PoisonPill
+//let private (<!!!) a (b:PoisonPill) = a <! b
 
-//Overload <! to ensure that only a Msg can be sent using <! (except for the exception above!)
-let private (<!) a (b:Msg) = a<!b
+////Overload <! to ensure that only a Msg can be sent using <! (except for the exception above!)
+//let private (<!) a (b:Msg) = a<!b
 
-//Add a new operator to make it simpler to pass instructions around the place - Msg | Instruction
-let private (<!!) a (b:Instruction) = a <! (Instruction b)
+////Add a new operator to make it simpler to pass instructions around the place - Msg | Instruction
+//let private (<!!) a (b:Instruction) = a <! (Instruction b)
 
-//Add a new operator to make it simpler to pass data around the place - Msg | GameData
-let private (<!&) a (b:GameData) = a <! (GameData b)
+////Add a new operator to make it simpler to pass data around the place - Msg | GameData
+//let private (<!&) a (b:GameData) = a <! (GameData b)
 
-//Add a new operator to make it simpler to pass data around the place - Msg | GameData
-let private (<!%) a (b:PlayerMessage) = a <! (PlayerMessage b)
+////Add a new operator to make it simpler to pass data around the place - Msg | GameData
+//let private (<!%) a (b:PlayerMessage) = a <! (PlayerMessage b)
 
 //Helper function to make it easier to send messages to the console
-let private cnslMsg m c = WriteToConsole ({msg = m; colour = int c} |> Complex)
+//let private cnslMsg m c = WriteToConsole ({msg = m; colour = int c} |> Complex)
 
 
 
@@ -75,7 +76,7 @@ let gamesMaster (mailbox: Actor<Msg>) =
     let gamesMasterPersona = {playerName = setPlayerName "GamesMaster"; playerId = PlayerId None; socketId = SocketID Guid.Empty}
 
     let consoleWriter = select "/user/consoleWriter" mailbox.Context
-    consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg "The GamesMaster is Alive!!" ConsoleColor.Magenta}
+    consoleWriter <<! ("The GamesMaster is Alive!!", ConsoleColor.Magenta)
 
     let rec loop(players:Player list, highScores: ScoreLog list) = actor {
     

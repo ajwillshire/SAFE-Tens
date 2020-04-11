@@ -62,6 +62,8 @@ module TensTypes =
             | Simple of string
             | Complex of msgAndColour
             | Error of exn
+
+
    
 
 module CommTypes =
@@ -159,9 +161,6 @@ module MessageTypes =
     and PlayerMessage =
             {msg : Msg
              plyr: Player}
-
-
-
               
 
 

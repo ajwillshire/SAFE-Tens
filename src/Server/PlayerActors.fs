@@ -9,6 +9,7 @@ open Shared
 open CommTypes
 open TensTypes
 open MessageTypes
+open Operators
 
 open AutoPlayer
 
@@ -17,20 +18,20 @@ let overDebug = true
 
 let private random = System.Random()
 
-//Overload <! to ensure that only a Msg can be sent using <!
-let private (<!) a (b:Msg) = a<!b
+////Overload <! to ensure that only a Msg can be sent using <!
+//let private (<!) a (b:Msg) = a<!b
 
-//Add a new operator to make it simpler to pass instructions around the place - Msg | Instruction
-let private (<!!) a (b:Instruction) = a <! (Instruction b)
+////Add a new operator to make it simpler to pass instructions around the place - Msg | Instruction
+//let private (<!!) a (b:Instruction) = a <! (Instruction b)
 
-//Add a new operator to make it simpler to pass data around the place - Msg | GameData
-let private (<!&) a (b:GameData) = a <! (GameData b)
+////Add a new operator to make it simpler to pass data around the place - Msg | GameData
+//let private (<!&) a (b:GameData) = a <! (GameData b)
 
-//Add a new operator to make it simpler to pass data around the place - Msg | GameData
-let private (<!%) a (b:PlayerMessage) = a <! (PlayerMessage b)
+////Add a new operator to make it simpler to pass data around the place - Msg | GameData
+//let private (<!%) a (b:PlayerMessage) = a <! (PlayerMessage b)
 
 //Helper function to make it easier to send messages to the console
-let private cnslMsg m c = WriteToConsole ({msg = m; colour = int c} |> Complex)
+//let private cnslMsg m c = ({msg = m; colour = int c} |> Complex)
 
 
 //Used by the scheduler to keep track of Cancelables to cease messages
@@ -46,7 +47,7 @@ let scheduler (mailbox: Actor<Msg>) =
     let genAgent = select "../randomGenerator"  mailbox.Context
     let autoPlayer = select "../auto"  mailbox.Context
 
-    mailMan <! cnslMsg "Scheduler created" ConsoleColor.Blue
+    mailMan <<! ("Scheduler created", ConsoleColor.Blue)
 
     let myScheduler = mailbox.Context.System.Scheduler
 
@@ -63,12 +64,12 @@ let scheduler (mailbox: Actor<Msg>) =
                                 myCancelables.randomCancel.Cancel() //Hit cancel in case there's one already running
                                 let newCancelables = {myCancelables with randomCancel=new Cancelable(myScheduler)}
        
-                                mailMan <! cnslMsg "Send scheduled messages!" ConsoleColor.Red
+                                mailMan <<! ("Send scheduled messages!", ConsoleColor.Red)
                                 myScheduler.ScheduleTellRepeatedly(TimeSpan.Zero, TimeSpan.FromSeconds(1.), genAgent, Instruction Poke, ActorRefs.Nobody, newCancelables.randomCancel)
                                 return! loop(newCancelables)
 
                             | StopRandom -> 
-                                mailMan <! cnslMsg "Stop scheduled messages!" ConsoleColor.Red
+                                mailMan <<! ("Stop scheduled messages!", ConsoleColor.Red)
                                 myCancelables.randomCancel.Cancel() 
                                 return! loop(myCancelables)
 
@@ -76,12 +77,12 @@ let scheduler (mailbox: Actor<Msg>) =
                                 myCancelables.autoCancel.Cancel() //Hit cancel in case there's one already running
                                 let newCancelables = {myCancelables with autoCancel=new Cancelable(myScheduler)}
        
-                                mailMan <! cnslMsg "Start autopick!" ConsoleColor.Magenta
+                                mailMan <<! ("Start autopick!", ConsoleColor.Magenta)
                                 myScheduler.ScheduleTellRepeatedly(TimeSpan.Zero, TimeSpan.FromSeconds(1.5), autoPlayer, Instruction Poke, ActorRefs.Nobody, newCancelables.autoCancel)
                                 return! loop(newCancelables)
 
                             | StopAuto ->
-                                mailMan <! cnslMsg "Stop autopick!" ConsoleColor.Magenta
+                                mailMan <<! ("Stop autopick!", ConsoleColor.Magenta)
                                 myCancelables.autoCancel.Cancel()
                                 return! loop(myCancelables)
 
@@ -98,14 +99,14 @@ let randomNumberGenerator (mailbox: Actor<Msg>) =
     let mailMan = select "../mailMan"  mailbox.Context
     let randomHandler = select "../randomHandler"  mailbox.Context
 
-    mailMan <! cnslMsg "Random generator created" ConsoleColor.Blue
+    mailMan <<! ("Random generator created", ConsoleColor.Blue)
 
     let rec loop () = actor {
         let! message = mailbox.Receive()
 
         match message with
         | Instruction Poke -> let newNum = random.Next(1,9)
-                              if overDebug then mailMan <! cnslMsg (string newNum) ConsoleColor.DarkBlue
+                              if overDebug then mailMan <<! (string newNum, ConsoleColor.DarkBlue)
                               randomHandler <!& NewRandom newNum
         | _ -> ()
         
@@ -119,7 +120,7 @@ let randomHandler (mailbox: Actor<Msg>) =
     let mailMan = select "../mailMan"  mailbox.Context
     let validator = select "../validator"  mailbox.Context
 
-    mailMan <! cnslMsg "RandomHandler created" ConsoleColor.Blue
+    mailMan <<! ("RandomHandler created", ConsoleColor.Blue)
 
     let rec loop (randomNumbers:GameNumbers) = actor {
         let! msg = mailbox.Receive()
@@ -129,7 +130,7 @@ let randomHandler (mailbox: Actor<Msg>) =
         | Instruction i -> match i with
                             | ClearNumbers -> let newNums = RandomNumbers[]
                                               mailMan <!& GameNums newNums
-                                              if overDebug then mailMan <! cnslMsg "Clearing random numbers" ConsoleColor.DarkCyan
+                                              if overDebug then mailMan <<! ("Clearing random numbers", ConsoleColor.DarkCyan)
                                               return! loop(newNums)
 
                             | RemoveNumber i -> let newNums = removeFromGameNumbers randomNumbers i
@@ -161,7 +162,7 @@ let clickedHandler (mailbox: Actor<Msg>) =
         let randomHandler = select "../randomHandler"  mailbox.Context
         let validator = select "../validator"  mailbox.Context
 
-        mailMan <! cnslMsg "ClickedHandler created" ConsoleColor.Blue
+        mailMan <<! ("ClickedHandler created", ConsoleColor.Blue)
 
         let rec loop (clickedNumbers:GameNumbers) = actor {
             let! msg = mailbox.Receive ()
@@ -169,7 +170,7 @@ let clickedHandler (mailbox: Actor<Msg>) =
             match msg with
             | Instruction i -> match i with 
                                     | NewClickedNumber n -> let newNums = addToGameNumbers clickedNumbers n.number
-                                                            if debug then mailMan <! cnslMsg (sprintf "You picked %i!" n.number) ConsoleColor.DarkMagenta
+                                                            if debug then mailMan <<! ((sprintf "You picked %i!" n.number), ConsoleColor.DarkMagenta)
                                                             randomHandler <!! RemoveNumber n
                                                             mailMan <!& GameNums newNums
                                                             validator <!& GameNums newNums
@@ -177,7 +178,7 @@ let clickedHandler (mailbox: Actor<Msg>) =
 
                                     | ClearNumbers -> let newNums = ClickedNumbers[]
                                                       mailMan <!& GameNums newNums
-                                                      if overDebug then mailMan <! cnslMsg "Clearing clicked numbers" ConsoleColor.DarkCyan
+                                                      if overDebug then mailMan <<! ("Clearing clicked numbers", ConsoleColor.DarkCyan)
                                                       return! loop(newNums)
 
                                     | _ -> return! loop (clickedNumbers)
@@ -191,7 +192,7 @@ let validator (mailbox: Actor<Msg>) =
 
     let mailMan = select "../mailMan"  mailbox.Context
 
-    mailMan <! cnslMsg "Validator created" ConsoleColor.Blue
+    mailMan <<! ("Validator created", ConsoleColor.Blue)
 
     let rec loop() = actor {
 
@@ -210,7 +211,7 @@ let validator (mailbox: Actor<Msg>) =
                                                     | (x, _) when x > 5 -> currentGame <!& Fail TooManyNumbers
                                                     | (_,y) when y > 10 -> currentGame <!& Fail OverTen
                                                     | (_, 10) -> clickedHandler <! Instruction ClearNumbers
-                                                                 mailMan <! cnslMsg "You made 10!" ConsoleColor.Blue
+                                                                 mailMan <<! ("You made 10!", ConsoleColor.Blue)
                                                                  currentGame <!! IncrementScore 1
                                                     | _ -> ()
                                           
@@ -240,19 +241,19 @@ let currentGame (mailbox: Actor<Msg>) =
 
         match message with
 
-            | Instruction i ->  if overDebug then mailMan <! cnslMsg (sprintf "Received Instruction - %s" (string i)) ConsoleColor.Green
+            | Instruction i ->  if overDebug then mailMan <<! ((sprintf "Received Instruction - %s" (string i)), ConsoleColor.Green)
                                 match i with
 
-                                | StartGame ->  mailMan <! cnslMsg "Start Game" ConsoleColor.Green
+                                | StartGame ->  mailMan <<! ("Start Game", ConsoleColor.Green)
                                                 return! loop(Score 0)
 
                                 | ClearNumbers -> randomHandler <!! ClearNumbers
                                                   clickedHandler <!! ClearNumbers
-                                                  mailMan <! cnslMsg "Clearing game numbers" ConsoleColor.Cyan
+                                                  mailMan <<! ("Clearing game numbers", ConsoleColor.Cyan)
                                                   return! loop(currentScore)
 
                                 | IncrementScore x ->   let newScore = getScoreValue currentScore + x
-                                                        if debug then mailMan <! cnslMsg (sprintf "Current score :%i" newScore) ConsoleColor.DarkGreen
+                                                        if debug then mailMan <<! ((sprintf "Current score :%i" newScore), ConsoleColor.DarkGreen)
                                                         let newGame = Score newScore
                                                         mailMan <!& ScoreUpdate newGame
                                                         return! loop(newGame)
@@ -260,9 +261,9 @@ let currentGame (mailbox: Actor<Msg>) =
                                 | _ -> return! loop(currentScore)
 
 
-            | GameData g -> if overDebug then mailMan <! cnslMsg (sprintf "Received Data - %s" (string g)) ConsoleColor.Green
+            | GameData g -> if overDebug then mailMan <<! ((sprintf "Received Data - %s" (string g)), ConsoleColor.Green)
                             match g with
-                            | Fail f -> if debug then mailMan <! cnslMsg ("Fail message received!! - " + string f) ConsoleColor.Red 
+                            | Fail f -> if debug then mailMan <<! (("Fail message received!! - " + string f), ConsoleColor.Red)
                                         mailMan <!& Fail f
                                         scheduler <!! StopRandom
                                         scheduler <!! StopAuto
