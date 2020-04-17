@@ -13,7 +13,7 @@ open PlayerActors
 
 
 let debug = true
-let overDebug = true
+let overDebug = false
 
 //Take all of the console messages and deal with them concurrently - it keeps the colours in check!
 let consoleWriter (mailbox: Actor<Msg>) =
@@ -49,7 +49,7 @@ let consoleWriter (mailbox: Actor<Msg>) =
     loop ()
 
 
-type ScoreLog = {playerName:string; highScore: Score}
+
 
 let gamesMaster (mailbox: Actor<Msg>) =
 
@@ -62,70 +62,80 @@ let gamesMaster (mailbox: Actor<Msg>) =
     
         let! playerMessage = mailbox.Receive()
 
-        if overDebug then consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg  "PlayerMessage Received!" ConsoleColor.Magenta}
+        if overDebug then consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg "PlayerMessage Received!" ConsoleColor.Magenta}
 
         match playerMessage with
 
-            | PlayerMessage m ->
+        | PlayerMessage m ->
 
-                match m.msg with
+            match m.msg with
 
-                    //The NewPlayer instruction is one for the Gamesmaster to instantiate the player hierarchy of actors
-                    | Instruction (NewPlayer n) -> let playerNumber = match players.Length with
-                                                                        | 0 -> 1
-                                                                        | _ -> (players |> List.choose(fun x -> getPlayerId x.playerId)
-                                                                                        |> List.max) + 1
+                //The NewPlayer instruction is one for the Gamesmaster to instantiate the player hierarchy of actors
+                | Instruction (NewPlayer n) ->  let playerNumber = match players.Length with
+                                                                    | 0 -> 1
+                                                                    | _ -> (players |> List.choose(fun x -> getPlayerId x.playerId)
+                                                                                    |> List.max) + 1
 
-                                                   let updatedPlyr = {n with playerId = setPlayerId playerNumber}
-                                                   let playerName = getSafePlayerName updatedPlyr.playerName
+                                                let updatedPlyr = {n with playerId = setPlayerId playerNumber}
+                                                let playerName = getSafePlayerName updatedPlyr
 
-                                                   consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg  ("Trying to spawn NewPlayer - " + playerName) ConsoleColor.Magenta}
+                                                consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg  ("Trying to spawn NewPlayer - " + playerName) ConsoleColor.Magenta}
 
-                                                   let newPlayerActor = spawn mailbox.Context.System playerName (playerActor updatedPlyr) 
-                                                   newPlayerActor <!& (SetPlayerId playerNumber)
-                                                   let newList = players @ [updatedPlyr]
-                                                   consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg  ("New player registered - " + playerName + " - " + string playerNumber + " (Number of active players: " + (string newList.Length) + ")") ConsoleColor.Magenta}
+                                                let newPlayerActor = spawn mailbox.Context.System playerName (playerActor updatedPlyr) 
+                                                newPlayerActor <!& (SetPlayerId playerNumber)
+                                                let newList = players @ [updatedPlyr]
+                                                consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg  ("New player registered - " + playerName + " - " + string playerNumber + " (Number of active players: " + (string newList.Length) + ")") ConsoleColor.Magenta}
 
-                                                   return! loop(newList, highScores)
+                                                return! loop(newList, highScores)
 
-                    //This is to remove all of the other players from the Actor system, ultimately via means of a Poison Pill                                
-                    | Instruction (DeleteAllOtherPlayers p) -> players
-                                                                 |> List.filter (fun x -> x.playerName <> p.playerName)
-                                                                 |> List.iter (fun q -> let player = (select ("user/"+ (getSafePlayerName q.playerName)) mailbox.Context.System)
-                                                                                        player <!% {plyr = p; msg = GameData (Fail HardStop)})
+                //This is to remove all of the other players from the Actor system, ultimately via means of a Poison Pill                                
+                | Instruction (DeleteAllOtherPlayers p) ->  players
+                                                                |> List.filter (fun x -> x.playerId <> p.playerId)
+                                                                |> List.iter (fun q -> let player = (select ("user/"+ (getSafePlayerName q)) mailbox.Context.System)
+                                                                                       player <!% {plyr = p; msg = GameData (Fail HardStop)})
 
-                                                               consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg ("All other players deleted!!") ConsoleColor.Red}
-                                                               return! loop ([p],highScores)
+                                                            consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg ("All other players deleted!!") ConsoleColor.Red}
+                                                            return! loop ([p],highScores)
 
-                    //An actor that has been told to "HardStop" will reply with a KillMeNow instruction
-                    | Instruction KillMeNow -> mailbox.Sender() <!!! PoisonPill.Instance
-                                               let senderPath = mailbox.Sender().Path.ToString()
-                                               consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg (senderPath + " has been killed.") ConsoleColor.Red}
-                                               return! loop (players, highScores)
+                | Instruction CloseEvent -> consoleWriter <<! ("Close event received", ConsoleColor.Cyan)
+                                            return! loop (players, highScores)
 
-                    | GameData (HighScore h) -> let newHighScores = ([{playerName = getPlayerName m.plyr.playerName; highScore = h}] @ highScores)
-                                                                    |> List.sortByDescending(fun a -> a.highScore)
-                                                                    |> List.truncate(5)
+                //An actor that has been told to "HardStop" will reply with a KillMeNow instruction
+                | Instruction KillMeNow ->  let player = select ("user/"+ (getSafePlayerName m.plyr)) mailbox.Context.System
+                                            player <!!! PoisonPill.Instance
+                                            let newPlayers = players |> List.filter (fun x -> x.playerId <> m.plyr.playerId)
 
-                                                consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg (sprintf "Current High Scorer is %s with %i" newHighScores.[0].playerName (getScoreValue newHighScores.[0].highScore)) ConsoleColor.Red}
-                                                return! loop (players, newHighScores)
+                                            consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg (getSafePlayerName m.plyr + " has been killed.") ConsoleColor.Red}
+                                            return! loop (newPlayers, highScores)
+
+                | GameData (HighScore h) -> let newHighScores = ([{playerName = getPlayerName m.plyr.playerName; actorName = getSafePlayerName m.plyr; highScore = h}] @ highScores)
+                                                                |> List.sortByDescending(fun a -> a.highScore)
+                                                                |> List.truncate(5)
+
+                                            let player = (select ("user/"+ (getSafePlayerName m.plyr)) mailbox.Context.System)
+                                            player <!& ScoreLogs newHighScores
+
+                                            consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg (sprintf "Current High Scorer is %s with %i" newHighScores.[0].playerName (getScoreValue newHighScores.[0].highScore)) ConsoleColor.Red}
+                                            return! loop (players, newHighScores)
+
+                | WriteToConsole _ -> consoleWriter <!% m
 
 
-                    //All other messages get routed through to the relevant player
-                    | _ ->  let getPlayer = players |> List.filter(fun x -> x.playerId = m.plyr.playerId)
-                                                    |> List.tryExactlyOne
+                //All other messages get routed through to the relevant player
+                | _ ->  let getPlayer = players |> List.filter(fun x -> x.playerId = m.plyr.playerId)
+                                                |> List.tryExactlyOne
                     
-                            match getPlayer with
-                            | Some p -> consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg  ("GamesMaster sending on message to " + string p) ConsoleColor.Blue}
-                                        select ("user/"+ getSafePlayerName p.playerName)  mailbox.Context.System  <! m.msg
-                                        //return! loop(players, highScores)
+                        match getPlayer with
+                        | Some p -> consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg  ("GamesMaster sending on message to " + string p + string m.msg) ConsoleColor.Blue}
+                                    select ("user/"+ getSafePlayerName p)  mailbox.Context.System  <! m.msg
+                                    //return! loop(players, highScores)
 
-                            | None ->  consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg  ("That player was not found - " + string m.plyr) ConsoleColor.DarkRed}
+                        | None ->  consoleWriter <!% {plyr = gamesMasterPersona; msg = cnslMsg  ("That player was not found - " + string m.plyr + string m.msg) ConsoleColor.DarkRed}
 
-                            return! loop(players, highScores)
+                        return! loop(players, highScores)
 
 
-            | _ -> return! loop(players, highScores)
+        | _ -> return! loop(players, highScores)
     }
     loop ([],[])
 

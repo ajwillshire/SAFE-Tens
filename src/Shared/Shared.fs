@@ -8,6 +8,8 @@ module TensTypes =
 
     let getScoreValue(Score i) = i
 
+    type ScoreLog = {playerName:string; actorName:string; highScore: Score}
+
 
     type PlayerId = PlayerId of int option
 
@@ -22,7 +24,7 @@ module TensTypes =
                                         | Some s -> s
                                         | None -> ""
 
-    let getSafePlayerName p = (getPlayerName p).Replace(" ", "_")
+
 
     type SocketID = SocketID of Guid
 
@@ -37,9 +39,12 @@ module TensTypes =
         socketId:SocketID
         }
 
-    type Extras =
+    let getSafePlayerName (p:Player) = (getPlayerName p.playerName).Replace(" ", "_") + "_" + string (match getPlayerId p.playerId with | Some n -> n | None -> -1)
+
+    type GameSystemData =
         {
-         HighScore : int
+         PlayerHighScore : Score
+         SystemHighScores : ScoreLog list
         }
 
     type GameConfig =
@@ -73,6 +78,8 @@ module CommTypes =
     type GameNumbers =
         | RandomNumbers of int list
         | ClickedNumbers of int list
+
+    let getNumbers(RandomNumbers(data)|ClickedNumbers(data)) = data
 
     let getNumberByIndex(RandomNumbers(data)|ClickedNumbers(data)) i = data.[i]
 
@@ -117,6 +124,7 @@ module MessageTypes =
         | UpdatePlayerName of string
         | DeleteAllOtherPlayers of Player
         | KillMeNow
+        | ReRegister
         | StartGame
         | StartRandom
         | StopRandom
@@ -130,12 +138,15 @@ module MessageTypes =
         | SendMeNumbers //Internal (Server)
         | Poke //Internal (Server)
         | ChangeView of ViewState
+        | KeyPress of string
+        | CloseEvent
 
 
     type FailMessage =
         | TooManyNumbers //From RandomHandler
         | OverTen //From ClickedHandler
-        | HardStop //of Player //From User interface
+        | HardStop
+        | Ended
 
 
 
@@ -144,11 +155,12 @@ module MessageTypes =
         | GameNums of GameNumbers
         | ScoreUpdate of Score
         | HighScore of Score
+        | ScoreLogs of ScoreLog list
         | SetChannelSocketId of SocketID
         | SetWebSocket of WebSocket
         | SetPlayerId of int
-        | Fail of FailMessage // Internal (Server)
-        | NewRandom of int //Internal (Server) - from random generator to RandomHandler
+        | Fail of FailMessage
+        | NewRandom of int
 
 
 
@@ -156,7 +168,7 @@ module MessageTypes =
         | Instruction of Instruction
         | GameData of GameData
         | WriteToConsole of ConsoleMessage
-        | PlayerMessage of PlayerMessage
+        | PlayerMessage of PlayerMessage //Recursive data-type, wrapping up a Msg
 
     and PlayerMessage =
             {msg : Msg

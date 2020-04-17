@@ -14,28 +14,12 @@ open Operators
 open AutoPlayer
 
 let debug = true
-let overDebug = true
+let overDebug = false
 
 let private random = System.Random()
 
-////Overload <! to ensure that only a Msg can be sent using <!
-//let private (<!) a (b:Msg) = a<!b
-
-////Add a new operator to make it simpler to pass instructions around the place - Msg | Instruction
-//let private (<!!) a (b:Instruction) = a <! (Instruction b)
-
-////Add a new operator to make it simpler to pass data around the place - Msg | GameData
-//let private (<!&) a (b:GameData) = a <! (GameData b)
-
-////Add a new operator to make it simpler to pass data around the place - Msg | GameData
-//let private (<!%) a (b:PlayerMessage) = a <! (PlayerMessage b)
-
-//Helper function to make it easier to send messages to the console
-//let private cnslMsg m c = ({msg = m; colour = int c} |> Complex)
-
-
 //Used by the scheduler to keep track of Cancelables to cease messages
-type LocalCancelables =
+type private LocalCancelables =
     {
         randomCancel:Cancelable
         autoCancel:Cancelable
@@ -357,9 +341,6 @@ let playerActor (playerSpec:Player) (mailbox : Actor<Msg>) =
                                         gamesMaster <!% {plyr = playerSpec; msg = message}
                                         return! loop(h)
                                     else return! loop(highScore)
-
-        //Forward on the KillMeNow message to the GamesMaster when the final messages have been sent                                
-        | Instruction KillMeNow -> gamesMaster <!% {plyr = playerSpec; msg = message}
 
         //Anything else is forwarded on to the MailMan
         | _ -> mailMan <! message

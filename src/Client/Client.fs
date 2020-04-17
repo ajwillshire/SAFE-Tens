@@ -7,6 +7,8 @@ open Thoth.Json
 
 open Shared
 open MessageTypes
+open Model
+open Shared.TensTypes
 
 
 module Channel =
@@ -39,17 +41,32 @@ module Channel =
 
         Cmd.ofSub sub
 
+module WindowEvents =
+    let unloadSub _ =
+        let setUnloadEvent dispatch = 
+            Browser.Dom.window.onbeforeunload <- (fun _ -> dispatch (Instruction KillMeNow))
+            
+        Cmd.ofSub setUnloadEvent
+
+module KeyboardEvents =
+    let keyPressSub _ =
+        let keyPress dispatch =
+            Browser.Dom.window.onkeypress <- (fun a -> dispatch (Instruction (KeyPress a.key)))
+        Cmd.ofSub keyPress
 
 
+let subs model = Cmd.batch [WindowEvents.unloadSub model
+                            KeyboardEvents.keyPressSub model
+                            Channel.subscription model]
 
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR
 #endif
 
-//Program.mkProgram Model.init Model.update View.render
+
 Program.mkProgram Model.init Model.update ViewFeliz.render
-|> Program.withSubscription Channel.subscription
+|> Program.withSubscription subs //Channel.subscription
 
 
 #if DEBUG

@@ -20,33 +20,30 @@ open MessageTypes
 
 let safeComponents =
 
-        Html.span [
-            str "Version "
-            Html.strong [str Version.app]
-            str " powered by: "
-            Html.h3
+        Html.h3 [
+            prop.children
                 [
-                
-                prop.children
-                    [
-                    Html.a [prop.href "https://github.com/SAFE-Stack/SAFE-template"; prop.text "SAFE"; prop.key "Item1" ]
-                    str ", "
-                    Html.a [prop.href "https://saturnframework.github.io"; prop.text "Saturn"; prop.key "Item2"  ]
-                    str ", "
-                    Html.a [prop.href "http://fable.io"; prop.text "Fable"; prop.key "Item3"  ]
-                    str ", "
-                    Html.a [prop.href "https://elmish.github.io"; prop.text "Elmish"; prop.key "Item4"  ]
-                    str ", "
-                    Html.a [prop.href "https://getakka.net/"; prop.text "Akka.NET"; prop.key "Item5"  ]
-                    str ", "
-                    Html.a [prop.href "https://github.com/Zaid-Ajaj/Feliz"; prop.text "Feliz"; prop.key "Item6"  ]
-                    str ", "
-                    Html.a [prop.href "https://github.com/Dzoukr/Feliz.Bulma"; prop.text "Feliz.Bulma"; prop.key "Item7"  ]
-                    str ", "
-                    Html.a [prop.href "https://github.com/Fulma/Fulma/tree/master/src/Fable.FontAwesome"; prop.text "Fable.FontAwesome"; prop.key "Item8"  ]
-                    ]
+                str "Version "
+                Html.strong [str Version.app]
+                str " powered by: "
+                Html.a [prop.href "https://github.com/SAFE-Stack/SAFE-template"; prop.text "SAFE"]
+                str ", "
+                Html.a [prop.href "https://saturnframework.github.io"; prop.text "Saturn"]
+                str ", "
+                Html.a [prop.href "http://fable.io"; prop.text "Fable"]
+                str ", "
+                Html.a [prop.href "https://elmish.github.io"; prop.text "Elmish"]
+                str ", "
+                Html.a [prop.href "https://getakka.net/"; prop.text "Akka.NET"]
+                str ", "
+                Html.a [prop.href "https://github.com/Zaid-Ajaj/Feliz"; prop.text "Feliz"]
+                str ", "
+                Html.a [prop.href "https://github.com/Dzoukr/Feliz.Bulma"; prop.text "Feliz.Bulma"]
+                str ", "
+                Html.a [prop.href "https://github.com/Fulma/Fulma/tree/master/src/Fable.FontAwesome"; prop.text "Fable.FontAwesome"]
                 ]
             ]
+
 
 // ***********************************************
 
@@ -95,8 +92,6 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
     let playerDetails = match getPlayerName player.playerName with
                             | "" -> "Unknown Player!"
                             | n -> "Player Name: " + n
-
-
 
     //Here's what will be the page layout and what is returned from the function
 
@@ -207,7 +202,7 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
                 ]
 
                 Bulma.footer [
-                    prop.children[Html.span safeComponents]
+                    prop.children[safeComponents]
                     prop.style [style.textAlign.center; style.boxShadow (10,10,color.lightSteelBlue)]
                 ]
         
@@ -216,7 +211,23 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
 ]
 
 
-let private renderFinished gameOver (dispatchI : Instruction -> unit) =
+let makeTableRow (sc:ScoreLog) =
+                        Html.tableRow[
+                            prop.children[
+                                Html.tableCell[prop.text sc.playerName; prop.style[style.padding 20]]
+                                Html.tableCell[prop.text sc.actorName; prop.style[style.padding 20]]
+                                Html.tableCell[prop.text (getScoreValue sc.highScore); prop.style[style.padding 20]]
+                            ]]
+
+let makeTableHeaderRow =
+    Html.tableRow[
+        prop.children[
+            Html.tableCell[prop.text "Player"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
+            Html.tableCell[prop.text "Actor"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
+            Html.tableCell[prop.text "Score"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
+        ]]
+
+let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> unit) =
     
     Html.div [
         prop.style[style.margin 50]
@@ -230,29 +241,35 @@ let private renderFinished gameOver (dispatchI : Instruction -> unit) =
                                                                             | FailMessage.HardStop -> match gameOver.culprit with
                                                                                                         | Some p -> sprintf "%s pulled the plug on your game!" (getPlayerName p.playerName)
                                                                                                         | None -> "An unknown person pulled the plug on your game"
+                                                                            | Ended -> "You quit!"
                                                                             ))
             Html.h2 [prop.style [ style.padding 40 ]]
 
             match gameOver.failReason with
-                        | FailMessage.HardStop _ -> ()
+                        //HardStop means that your Actors were deleted - no prospect of Restarting
+                        | FailMessage.HardStop _ -> makeButton "Re-Register" (fun _ -> dispatchI ReRegister) 
                         | _ ->
                                 Bulma.columns [
                                     column.is2
                                     prop.children [
-                                        Bulma.button [
-                                            button.isPrimary
-                                            button.isLarge
-                                            prop.style [ style.fontSize 20 ]
-                                            prop.onClick (fun _ ->  dispatchI (ClearNumbers)
-                                                                    dispatchI (StartGame))
-                                            prop.text "Restart"
-                                        ]
+                                        makeButton "Restart " (fun _ ->  [ClearNumbers; StartGame] |> List.map (dispatchI) |> ignore)
+                                        makeButton "End Session " (fun _ ->  [KillMeNow; ReRegister] |> List.map (dispatchI) |> ignore)
                                     ]
                                     prop.style[style.margin 0]
                                 ]
+
+            Html.h2 [prop.text "System High Scores"; prop.style [ style.padding 30 ]]
+            
+            Html.table[
+                    prop.children[
+                        makeTableHeaderRow
+                        yield! game.GameSystemData.SystemHighScores |> List.map (fun r -> makeTableRow r)
+                    ]
+            ]
+
+
         ]
     ]
-
 
 
 let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
@@ -266,36 +283,39 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                 prop.text "Welcome to SAFE Tens"
             ]
 
-
-            Html.h2 [
-                prop.style [ style.padding 40; style.paddingLeft 0 ]
-                prop.text "Please enter your name:"
-            ]
-
-            Bulma.textInput [
-                prop.style[]
-                prop.valueOrDefault (getPlayerName state.Player.playerName)
-
-                prop.onChange(UpdatePlayerName >> dispatchI)
-
-            ]
-
             Html.h2 [prop.style [ style.padding 20 ]]
 
-            match getPlayerName state.Player.playerName with
-            | "" -> ()
-            | _ ->
-                Bulma.button [
-                    prop.style[]
-                    prop.onClick (fun _ -> (dispatchI (NewPlayer state.Player)))
-                    prop.text "Create player"
-                ]
-
             match getPlayerId state.Player.playerId with
-                | None -> () //If playerId is none, it returns -1
+                //If PlayerId is not set, the player needs to register before proceeding
+                | None ->   Html.h2 [
+                                prop.style [ style.padding 40; style.paddingLeft 0 ]
+                                prop.text "Please enter your name:"
+                            ]
+
+                            Bulma.textInput [
+                                prop.style[style.padding 30]
+                                prop.valueOrDefault (getPlayerName state.Player.playerName)
+                                prop.onChange(UpdatePlayerName >> dispatchI)
+                            ]
+
+                            match getPlayerName state.Player.playerName with
+                            | "" -> ()
+                            | _ ->
+                                Html.h2 [
+                                    prop.style [ style.padding 40; style.paddingLeft 0 ]
+                                ]
+                                Bulma.button [
+                                    prop.style[]
+                                    prop.onClick (fun _ -> dispatchI (NewPlayer state.Player))
+                                    prop.text "Create player"
+                                ]
+
+                //If PlayerId is set, the player can start the game
                 | _ ->
 
-                    Html.h2 [prop.style [ style.padding 40 ]]
+                    Html.h2 [
+                        prop.text (sprintf "Hello %s!" (getPlayerName state.Player.playerName))
+                        prop.style [style.padding 40; style.paddingLeft 0]]
 
                     Bulma.columns [
                         column.is2
@@ -331,5 +351,5 @@ let render (game: Model) (dispatch: Msg -> unit) =
 
   | Running state -> renderRunning state game dispatchI
 
-  | Finished gameOver -> renderFinished gameOver dispatchI
+  | FinishedGame gameOver -> renderFinished game gameOver dispatchI
 
