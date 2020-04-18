@@ -7,8 +7,6 @@ open Thoth.Json
 
 open Shared
 open MessageTypes
-open Model
-open Shared.TensTypes
 
 
 module Channel =
@@ -16,6 +14,12 @@ module Channel =
     type ChannelMessage = { Topic : string; Payload : string }
 
     let inline decode<'a> x = x |> unbox<string> |> Decode.Auto.unsafeFromString<'a>
+
+    let buildWsSender (ws:WebSocket) : WsSender =
+        fun (message:Msg) ->
+            let message = {| Topic = ""; Ref = ""; Payload = message |}
+            let message = Thoth.Json.Encode.Auto.toString(0, message)
+            ws.send message
 
     let subscription _ =
         let sub dispatch =
@@ -30,11 +34,14 @@ module Channel =
                 let ws = WebSocket.Create(url)
                 ws.onmessage <- onWebSocketMessage
                 ws.onopen <- (fun ev ->
+                    dispatch (GameData (ConnectionChange (ConnectedToServer (buildWsSender ws))))
                     printfn "WebSocket opened")
                 ws.onclose <- (fun ev ->
+                    dispatch (GameData (ConnectionChange DisconnectedFromServer))
                     printfn "WebSocket closed. Retrying connection"
                     promise { 
                         do! Promise.sleep 2000
+                        dispatch (GameData (ConnectionChange Connecting))
                         connect() })
 
             connect()

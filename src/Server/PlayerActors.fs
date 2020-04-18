@@ -275,7 +275,7 @@ let mailMan (player:Player) (mailbox: Actor<Msg>) =
 
         match message with
             //If we receive an Instruction (probably but not necessarily from Client-side) we need to re-route it.
-            | Instruction i ->  consoleWriter <!% {plyr = player; msg = cnslMsg (sprintf "%s Instruction received by MailMan" (string i)) ConsoleColor.DarkRed}
+            | Instruction i ->  consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s Instruction received by MailMan" (string i)) ConsoleColor.DarkRed}
                                 match i with
                                 | StartGame _ -> select "../currentGame"  mailbox.Context <! message
                                 | ClearNumbers -> select "../currentGame"  mailbox.Context <! message
@@ -292,13 +292,13 @@ let mailMan (player:Player) (mailbox: Actor<Msg>) =
                                 | _ -> ()
 
             // If someone sends us data then we need to send it client-side as a Msg.
-            | GameData g -> do Channel.sendMessageViaHub (getSocketID player.socketId) "message" (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
-                            consoleWriter <!% {plyr = player; msg = cnslMsg (sprintf "%s GameData received by MailMan" (string g)) ConsoleColor.DarkRed}
+            | GameData g -> do Channel.sendMessageViaHub (getSocketID player.socketId) (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
+                            consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s GameData received by MailMan" (string g)) ConsoleColor.DarkRed}
 
-            | WriteToConsole m -> consoleWriter <!% {plyr = player; msg = WriteToConsole m}
+            | WriteToConsole m -> consoleWriter <!% {sender = player; msg = WriteToConsole m}
 
-            | PlayerMessage pm ->   do Channel.sendMessageViaHub (getSocketID player.socketId) "message" message (sprintf "Communications Error %s" (string pm)) |> ignore
-                                    consoleWriter <!% {plyr = player; msg = cnslMsg (sprintf "MailMan has received message from %s" (getPlayerName pm.plyr.playerName)) ConsoleColor.Blue}
+            | PlayerMessage pm ->   do Channel.sendMessageViaHub (getSocketID player.socketId) message (sprintf "Communications Error %s" (string pm)) |> ignore
+                                    consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "MailMan has received message from %s" (getPlayerName pm.sender.playerName)) ConsoleColor.Blue}
                                     match pm.msg with
                                     | GameData g -> match g with
                                                     | Fail (HardStop) -> select "../currentGame"  mailbox.Context <!& g
@@ -338,7 +338,7 @@ let playerActor (playerSpec:Player) (mailbox : Actor<Msg>) =
         match message with
         | GameData (HighScore h) -> if (getScoreValue h) > (getScoreValue highScore) then
                                         mailMan <! cnslMsg (sprintf "New high score of %i" (getScoreValue h)) ConsoleColor.DarkGreen
-                                        gamesMaster <!% {plyr = playerSpec; msg = message}
+                                        gamesMaster <!% {sender = playerSpec; msg = message}
                                         return! loop(h)
                                     else return! loop(highScore)
 

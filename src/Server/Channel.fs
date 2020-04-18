@@ -11,19 +11,24 @@ module Channel
     
     let mutable webSocketHub: Option<Channels.ISocketHub> = None
 
-    let sendMessage (hub:Channels.ISocketHub) socketId topic (payload:Msg) = task {
+    let sendMessage (hub:Channels.ISocketHub) socketId (payload:Msg) = task {
         let message = Encode.Auto.toString(0, payload)
-        do! hub.SendMessageToClient "/channel" socketId topic message }
+        do! hub.SendMessageToClient "/channel" socketId "message" message }
 
-    let broadcastMessage (hub:Channels.ISocketHub) topic (payload:Msg) = task {
+    let broadcastMessage (hub:Channels.ISocketHub) (payload:Msg) = task {
         let message = Encode.Auto.toString(0, payload)
-        do! hub.SendMessageToClients "/channel" topic message }
+        do! hub.SendMessageToClients "/channel" "message" message }
+
+
+    let sendSystemMessage (hub:Channels.ISocketHub) socketId (payload:Msg) = task {
+        let message = Encode.Auto.toString(0, payload)
+        do! hub.SendMessageToClient "/channel" socketId "system" message }
       
-    let sendMessageViaHub (socketId:Guid) topic payload (onError:string) = task{
+    let sendMessageViaHub (socketId:Guid) payload (onError:string) = task{
         let hub = webSocketHub
 
         match (hub,socketId) with
-        | Some s, c -> sendMessage s c topic payload |> ignore
+        | Some s, c -> sendMessage s c payload |> ignore
         | _,_ -> Console.WriteLine onError
     }
 

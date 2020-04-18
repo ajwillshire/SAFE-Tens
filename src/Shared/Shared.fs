@@ -112,14 +112,22 @@ module CommTypes =
         | RandomNumbers(data) -> RandomNumbers(removeAtIndex newNum.listIndex data)
         | ClickedNumbers(data) -> ClickedNumbers(removeAtIndex newNum.listIndex data)
 
-
-
 module MessageTypes =
 
     open CommTypes
     open TensTypes
 
-    type Instruction =
+
+
+
+
+    type Msg =
+        | Instruction of Instruction
+        | GameData of GameData
+        | WriteToConsole of ConsoleMessage
+        | PlayerMessage of PlayerMessage //Recursive data-type, wrapping up a Msg
+
+    and Instruction =
         | NewPlayer of Player
         | UpdatePlayerName of string
         | DeleteAllOtherPlayers of Player
@@ -140,45 +148,40 @@ module MessageTypes =
         | ChangeView of ViewState
         | KeyPress of string
         | CloseEvent
+        //| ReceivedFromServer of Msg
+        //| MessageChanged of string
 
 
-    type FailMessage =
+    and FailMessage =
         | TooManyNumbers //From RandomHandler
         | OverTen //From ClickedHandler
         | HardStop
         | Ended
 
-
-
-
-    type GameData =
+    and GameData =
         | GameNums of GameNumbers
         | ScoreUpdate of Score
         | HighScore of Score
         | ScoreLogs of ScoreLog list
         | SetChannelSocketId of SocketID
-        | SetWebSocket of WebSocket
+        | ConnectionChange of ConnectionState
         | SetPlayerId of int
         | Fail of FailMessage
         | NewRandom of int
 
-
-
-    type Msg =
-        | Instruction of Instruction
-        | GameData of GameData
-        | WriteToConsole of ConsoleMessage
-        | PlayerMessage of PlayerMessage //Recursive data-type, wrapping up a Msg
-
     and PlayerMessage =
             {msg : Msg
-             plyr: Player}
-              
+             sender: Player}
 
+    and WsSender = Msg -> Unit
 
+    and  ConnectionState =
+        | DisconnectedFromServer
+        | ConnectedToServer of WsSender
+        | Connecting
 
-
-
-
-
+        member this.IsConnected =
+            match this with
+            | ConnectedToServer _ -> true
+            | DisconnectedFromServer | Connecting -> false
 
