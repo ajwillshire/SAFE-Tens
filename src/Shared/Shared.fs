@@ -1,6 +1,6 @@
 namespace Shared
 open System
-open Browser.Types
+
 
 module TensTypes =
 
@@ -69,8 +69,6 @@ module TensTypes =
             | Error of exn
 
 
-   
-
 module CommTypes =
 
     open TensTypes
@@ -117,15 +115,12 @@ module MessageTypes =
     open CommTypes
     open TensTypes
 
-
-
-
-
     type Msg =
         | Instruction of Instruction
         | GameData of GameData
         | WriteToConsole of ConsoleMessage
         | PlayerMessage of PlayerMessage //Recursive data-type, wrapping up a Msg
+        | SysMsg of SysMsg
 
     and Instruction =
         | NewPlayer of Player
@@ -145,12 +140,17 @@ module MessageTypes =
         | IncrementScore of int //Internal (Server)
         | SendMeNumbers //Internal (Server)
         | Poke //Internal (Server)
-        | ChangeView of ViewState
-        | KeyPress of string
-        | CloseEvent
+
         //| ReceivedFromServer of Msg
         //| MessageChanged of string
 
+    and GameData =
+        | GameNums of GameNumbers
+        | ScoreUpdate of Score
+        | HighScore of Score
+        | ScoreLogs of ScoreLog list
+        | Fail of FailMessage
+        | NewRandom of int
 
     and FailMessage =
         | TooManyNumbers //From RandomHandler
@@ -158,30 +158,27 @@ module MessageTypes =
         | HardStop
         | Ended
 
-    and GameData =
-        | GameNums of GameNumbers
-        | ScoreUpdate of Score
-        | HighScore of Score
-        | ScoreLogs of ScoreLog list
-        | SetChannelSocketId of SocketID
-        | ConnectionChange of ConnectionState
-        | SetPlayerId of int
-        | Fail of FailMessage
-        | NewRandom of int
-
     and PlayerMessage =
             {msg : Msg
              sender: Player}
 
-    and WsSender = Msg -> Unit
+    and SysMsg =
+        | SetChannelSocketId of SocketID
+        | ConnectionChange of ConnectionState
+        | SetPlayerId of int
+        | ChangeView of ViewState
+        | KeyPress of string
+        | CloseEvent
 
     and  ConnectionState =
         | DisconnectedFromServer
-        | ConnectedToServer of WsSender
+        | ConnectedToServer of WsSender //WsSender
         | Connecting
 
         member this.IsConnected =
             match this with
             | ConnectedToServer _ -> true
             | DisconnectedFromServer | Connecting -> false
+
+    and WsSender = Msg -> Unit
 

@@ -19,6 +19,17 @@ open Channel
 open ActorManagement
 open Saturn.Channels
 
+//module UnitEncoder =
+
+//    let encoder = fun _ -> JsonValue.Parse("null")
+//    let decoder = fun _ _ -> Result.Ok()
+
+//    let extraCoders =
+//        Extra.empty
+//        |> Extra.withCustom encoder decoder
+        
+//    let serializer = ThothSerializer(extra = extraCoders)
+
 
 let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" -> None | x -> Some x
 
@@ -64,7 +75,7 @@ let mainChannel = channel {
 
             task {
                 do! Task.Delay 500
-                let m = (SocketID socketId |> (SetChannelSocketId >> GameData))
+                let m = (SocketID socketId |> (SetChannelSocketId >> SysMsg))
                 do! (sendMessageViaHub socketId m "Problem sending SocketId")
                 } |> ignore
             return Channels.Ok })

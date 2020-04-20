@@ -304,7 +304,11 @@ let mailMan (player:Player) (mailbox: Actor<Msg>) =
                                                     | Fail (HardStop) -> select "../currentGame"  mailbox.Context <!& g
                                                     | _ -> ()
                                     | _ -> ()
-                
+
+            // If someone sends us data then we need to send it client-side as a Msg.
+            | SysMsg s -> do Channel.sendMessageViaHub (getSocketID player.socketId) (SysMsg s) (sprintf "Communications Error %s" (string s)) |> ignore
+                          consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s SysData received by MailMan" (string s)) ConsoleColor.DarkRed}
+
         return! loop ()
     }
     loop ()

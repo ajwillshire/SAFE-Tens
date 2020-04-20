@@ -82,7 +82,8 @@ let gamesMaster (mailbox: Actor<Msg>) =
                                                 consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg  ("Trying to spawn NewPlayer - " + playerName) ConsoleColor.Magenta}
 
                                                 let newPlayerActor = spawn mailbox.Context.System playerName (playerActor updatedPlyr) 
-                                                newPlayerActor <!& (SetPlayerId playerNumber)
+                                                newPlayerActor <! SysMsg (SetPlayerId playerNumber)
+
                                                 let newList = players @ [updatedPlyr]
                                                 consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg  ("New player registered - " + playerName + " - " + string playerNumber + " (Number of active players: " + (string newList.Length) + ")") ConsoleColor.Magenta}
 
@@ -97,8 +98,8 @@ let gamesMaster (mailbox: Actor<Msg>) =
                                                             consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg ("All other players deleted!!") ConsoleColor.Red}
                                                             return! loop ([p],highScores)
 
-                | Instruction CloseEvent -> consoleWriter <<! ("Close event received", ConsoleColor.Cyan)
-                                            return! loop (players, highScores)
+                | SysMsg CloseEvent -> consoleWriter <<! ("Close event received", ConsoleColor.Cyan)
+                                       return! loop (players, highScores)
 
                 //An actor that has been told to "HardStop" will reply with a KillMeNow instruction
                 | Instruction KillMeNow ->  let player = select ("user/"+ (getSafePlayerName m.sender)) mailbox.Context.System

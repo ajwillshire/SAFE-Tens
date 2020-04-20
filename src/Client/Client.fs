@@ -15,11 +15,18 @@ module Channel =
 
     let inline decode<'a> x = x |> unbox<string> |> Decode.Auto.unsafeFromString<'a>
 
+    //type WsSender = Msg -> Unit
+
+
+
+
+
     let buildWsSender (ws:WebSocket) : WsSender =
         fun (message:Msg) ->
             let message = {| Topic = ""; Ref = ""; Payload = message |}
             let message = Thoth.Json.Encode.Auto.toString(0, message)
             ws.send message
+
 
     let subscription _ =
         let sub dispatch =
@@ -34,14 +41,14 @@ module Channel =
                 let ws = WebSocket.Create(url)
                 ws.onmessage <- onWebSocketMessage
                 ws.onopen <- (fun ev ->
-                    dispatch (GameData (ConnectionChange (ConnectedToServer (buildWsSender ws))))
+                    dispatch (SysMsg (ConnectionChange (ConnectedToServer (buildWsSender ws))))
                     printfn "WebSocket opened")
                 ws.onclose <- (fun ev ->
-                    dispatch (GameData (ConnectionChange DisconnectedFromServer))
+                    dispatch (SysMsg (ConnectionChange DisconnectedFromServer))
                     printfn "WebSocket closed. Retrying connection"
                     promise { 
                         do! Promise.sleep 2000
-                        dispatch (GameData (ConnectionChange Connecting))
+                        dispatch (SysMsg (ConnectionChange Connecting))
                         connect() })
 
             connect()
@@ -58,7 +65,7 @@ module WindowEvents =
 module KeyboardEvents =
     let keyPressSub _ =
         let keyPress dispatch =
-            Browser.Dom.window.onkeypress <- (fun a -> dispatch (Instruction (KeyPress a.key)))
+            Browser.Dom.window.onkeypress <- (fun a -> dispatch (SysMsg (KeyPress a.key)))
         Cmd.ofSub keyPress
 
 

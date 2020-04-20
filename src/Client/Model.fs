@@ -67,7 +67,7 @@ let private withoutCommands model = model, Cmd.none
 
 let sendPMToServer(game:Model) (msg:Msg) =    let pm = PlayerMessage {msg = msg; sender = game.Player}
                                               match game.ConnectionState with
-                                                            | ConnectedToServer s -> s pm
+                                                            | ConnectedToServer s -> s pm |> ignore
                                                             | _ -> ()
                                               Cmd.none
 
@@ -117,23 +117,7 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                                                             Player = {game.Player with playerId = PlayerId None;
                                                                                        playerName = PlayerName None}}, Cmd.none
 
-                | _, ChangeView v ->
-                    withoutCommands <| {game with ViewState = v}
 
-                | Running r, KeyPress k ->  //Check to see if it's a digit
-                                            match Int32.TryParse(k) with
-                                                             //If it's a digit we have to see if it's in the random numbers. If it is then "click" it.
-                                                | true, n -> match List.tryFindIndex (fun y -> y = n) (getNumbers r.Numbers) with
-                                                                | Some z -> game, Cmd.ofMsg(Instruction (NewClickedNumber({number = n; listIndex = z})))
-                                                                | _ -> withoutCommands <| game
-
-                                                       //Or have we implemented any other character keystrokes?
-                                                | _ -> match k with
-                                                        | "c" -> game,Cmd.ofMsg(Instruction ClearNumbers)
-                                                        | "a" -> game, Cmd.ofMsg(Instruction SingleAuto)
-                                                        | _ -> withoutCommands <| game
-
-                | _, KeyPress _ -> withoutCommands <| game
 
                 //All other commands get sent to the Server
                 | _, _ -> forwardToServer game msg
@@ -141,18 +125,6 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
     | state, GameData message ->
         Console.WriteLine (sprintf "GameData Message Received %s" (string message))
         match state, message with
-
-                | _, SetChannelSocketId g ->
-                    let newPlayer = {game.Player with socketId = g} //Will get the playerId from the Server in due course
-                    let cmd1 = Cmd.ofMsg (("Channel socket Id is " + string g) |> (Simple >> WriteToConsole))
-                    {game with Player = newPlayer}, cmd1
-
-                | _, ConnectionChange status ->
-                        { game with ConnectionState = status }, Cmd.none
-
-                | _, SetPlayerId i ->
-                    let newGame = {game with Player = {game.Player with playerId = setPlayerId i}}
-                    withoutCommands newGame
 
                 | Running state, GameNums ints ->
                     match ints with
@@ -188,6 +160,41 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                                                             | _ -> withoutCommands <| game
 
                                             | _ -> withoutCommands <| game
+
+    | state, SysMsg s ->
+        match state, s with
+                | _, SetChannelSocketId g ->
+                    let newPlayer = {game.Player with socketId = g} //Will get the playerId from the Server in due course
+                    let cmd1 = Cmd.ofMsg (("Channel socket Id is " + string g) |> (Simple >> WriteToConsole))
+                    {game with Player = newPlayer}, cmd1
+
+                | _, ConnectionChange status ->
+                        { game with ConnectionState = status }, Cmd.none
+
+                | _, SetPlayerId i ->
+                    let newGame = {game with Player = {game.Player with playerId = setPlayerId i}}
+                    withoutCommands newGame
+
+                | _, ChangeView v ->
+                    withoutCommands <| {game with ViewState = v}
+
+                | Running r, KeyPress k ->  //Check to see if it's a digit
+                                            match Int32.TryParse(k) with
+                                                             //If it's a digit we have to see if it's in the random numbers. If it is then "click" it.
+                                                | true, n -> match List.tryFindIndex (fun y -> y = n) (getNumbers r.Numbers) with
+                                                                | Some z -> game, Cmd.ofMsg(Instruction (NewClickedNumber({number = n; listIndex = z})))
+                                                                | _ -> withoutCommands <| game
+
+                                                       //Or have we implemented any other character keystrokes?
+                                                | _ -> match k with
+                                                        | "c" -> game,Cmd.ofMsg(Instruction ClearNumbers)
+                                                        | "a" -> game, Cmd.ofMsg(Instruction SingleAuto)
+                                                        | _ -> withoutCommands <| game
+
+                | _, KeyPress _ -> withoutCommands <| game
+
+                | _, CloseEvent -> forwardToServer game msg
+
 
     | _ ->    withoutCommands <| game
 

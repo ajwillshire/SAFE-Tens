@@ -77,7 +77,7 @@ let clickedButtons _ (number : int)   =
     ] 
 
 
-let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit) =
+let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit) (dispatchS : SysMsg -> unit) =
 
 
     let player = game.Player
@@ -134,7 +134,7 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
                                prop.style[style.padding 10]
                                prop.id "myradio1"
                                prop.name "radio"
-                               prop.onCheckedChange (fun _ -> dispatchI (ChangeView SimpleView))
+                               prop.onCheckedChange (fun _ -> dispatchS (ChangeView SimpleView))
                                prop.isChecked (game.ViewState = SimpleView)
                                prop.key "SimpleCR"
                             ]
@@ -145,7 +145,7 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
                                prop.style[style.padding 10]
                                prop.id "myradio2"
                                prop.name "radio"
-                               prop.onCheckedChange (fun _ -> dispatchI (ChangeView AdvancedView))
+                               prop.onCheckedChange (fun _ -> dispatchS (ChangeView AdvancedView))
                                prop.isChecked (game.ViewState = AdvancedView)
                                prop.key "AdvancedCR"
                             ]
@@ -345,11 +345,12 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
 let render (game: Model) (dispatch: Msg -> unit) =
 
   let dispatchI i = dispatch (Instruction i)
+  let dispatchS s = dispatch (SysMsg s)
 
   match game.ModelState with 
   | NotStarted -> renderNotStarted game dispatchI
 
-  | Running state -> renderRunning state game dispatchI
+  | Running state -> renderRunning state game dispatchI dispatchS
 
   | FinishedGame gameOver -> renderFinished game gameOver dispatchI
 
