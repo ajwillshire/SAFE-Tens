@@ -5,6 +5,8 @@ open Elmish
 open Elmish.React
 open Thoth.Json
 
+open Fable.Core
+
 open Shared
 open MessageTypes
 
@@ -73,6 +75,24 @@ let subs model = Cmd.batch [WindowEvents.unloadSub model
                             KeyboardEvents.keyPressSub model
                             Channel.subscription model]
 
+module CustomEncoders =
+
+    let inline addDummyCoder<'b> extrasIn =
+        let typeName = string typeof<'b>
+        let simpleEncoder(_ : 'b) = Encode.string (sprintf "%s function" typeName)
+        let simpleDecoder = Decode.fail (sprintf "Decoding is not supported for %s type" typeName)
+        extrasIn |> Extra.withCustom simpleEncoder simpleDecoder
+        
+    let inline buildExtras<'a> extraCoders =
+        let myEncoder:Encoder<'a> = Encode.Auto.generateEncoder(extra = extraCoders)
+        let myDecoder:Decoder<'a> = Decode.Auto.generateDecoder(extra = extraCoders)
+        (myEncoder, myDecoder)
+
+let extras = Extra.empty
+                |> CustomEncoders.addDummyCoder<WsSender>
+                |> CustomEncoders.buildExtras<Model.Model>
+
+
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR
@@ -80,14 +100,12 @@ open Elmish.HMR
 
 
 Program.mkProgram Model.init Model.update ViewFeliz.render
-|> Program.withSubscription subs //Channel.subscription
-
-
+|> Program.withSubscription subs 
 #if DEBUG
 |> Program.withConsoleTrace
 #endif
 |> Program.withReactBatched "elmish-app"
 #if DEBUG
-|> Program.withDebugger
+|> Program.withDebuggerCoders (fst extras) (snd extras)
 #endif
 |> Program.run
