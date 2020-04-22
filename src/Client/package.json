@@ -1,0 +1,19 @@
+{
+  "name": "safetensclient",
+  "version": "0.1.0",
+  "description": "Basic SafeTens",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bulma": "^0.8.2",
+    "bulma-checkradio": "^1.1.1",
+    "bulma-quickview": "^2.0.0",
+    "react": "^16.8.0",
+    "react-dom": "^16.8.0",
+    "recharts": "^1.8.5"
+  }
+}
