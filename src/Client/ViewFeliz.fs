@@ -125,7 +125,7 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
             ]
 
             Html.div[
-                Bulma.field.p [
+                Bulma.field.div [
                     prop.style[style.padding 30; style.outlineColor color.darkSlateBlue; style.outlineWidth 2; style.outlineStyle.double]
                     prop.children[
                         Html.div[
@@ -261,8 +261,11 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
             
             Html.table[
                     prop.children[
-                        makeTableHeaderRow
-                        yield! game.GameSystemData.SystemHighScores |> List.map (fun r -> makeTableRow r)
+                        thead[] [makeTableHeaderRow]
+                        tbody [] [
+                            yield! game.GameSystemData.SystemHighScores |> List.map (fun r -> makeTableRow r)
+                        ]
+                        tfoot[][]
                     ]
             ]
 
