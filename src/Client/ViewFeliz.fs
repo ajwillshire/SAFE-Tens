@@ -49,9 +49,9 @@ let safeComponents =
 
 
 let private makeButton (txt:string) (onClick) :ReactElement =
-    Bulma.button [
-        button.isFullwidth
-        button.isPrimary
+    Bulma.button.a [
+        button.isFullWidth
+        color.isPrimary
         prop.text txt
         prop.onClick onClick
         prop.style [style.margin 30]
@@ -60,15 +60,15 @@ let private makeButton (txt:string) (onClick) :ReactElement =
 
 //Helper functions for rendering elements
 let renderButton dispatchI index (number : int)   =
-    Bulma.button [
+    Bulma.button.a [
         prop.style [  style.fontSize 20 ]
         prop.onClick (fun _ -> dispatchI (NewClickedNumber {number = number; listIndex = index}))
         prop.text number
     ]
 
 let clickedButtons _ (number : int)   =
-    Bulma.button [
-        button.isSuccess
+    Bulma.button.a [
+        color.isSuccess
         prop.style [style.fontSize 20]
         prop.children [
             Html.text number
@@ -78,7 +78,6 @@ let clickedButtons _ (number : int)   =
 
 
 let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit) (dispatchS : SysMsg -> unit) =
-
 
     let player = game.Player
 
@@ -100,7 +99,7 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
         prop.style[style.margin 30]
         prop.children[
             Bulma.navbar [
-                Bulma.navbarItemDiv [
+                Bulma.navbarItem.div [
                         Html.h1 [
                             prop.style [style.fontSize 32; style.padding 30]
                             color.isDark
@@ -126,7 +125,7 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
             ]
 
             Html.div[
-                Bulma.field [
+                Bulma.field.div [
                     prop.style[style.padding 30; style.outlineColor color.darkSlateBlue; style.outlineWidth 2; style.outlineStyle.double]
                     prop.children[
                         Html.div[
@@ -262,8 +261,11 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
             
             Html.table[
                     prop.children[
-                        makeTableHeaderRow
-                        yield! game.GameSystemData.SystemHighScores |> List.map (fun r -> makeTableRow r)
+                        thead[] [makeTableHeaderRow]
+                        tbody [] [
+                            yield! game.GameSystemData.SystemHighScores |> List.map (fun r -> makeTableRow r)
+                        ]
+                        tfoot[][]
                     ]
             ]
 
@@ -292,7 +294,7 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                                 prop.text "Please enter your name:"
                             ]
 
-                            Bulma.textInput [
+                            Bulma.input.text [
                                 prop.style[style.padding 30]
                                 prop.valueOrDefault (getPlayerName state.Player.playerName)
                                 prop.onChange(UpdatePlayerName >> dispatchI)
@@ -304,7 +306,7 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                                 Html.h2 [
                                     prop.style [ style.padding 40; style.paddingLeft 0 ]
                                 ]
-                                Bulma.button [
+                                Bulma.button.a [
                                     prop.style[]
                                     prop.onClick (fun _ -> dispatchI (NewPlayer state.Player))
                                     prop.text "Create player"
@@ -321,16 +323,16 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                         column.is2
                         prop.children [
 
-                            Bulma.button [
-                                button.isPrimary
+                            Bulma.button.a [
+                                color.isPrimary
                                 button.isLarge
                                 prop.style [style.fontSize 20 ]
                                 prop.onClick (fun _ -> dispatchI (StartGame))
                                 prop.text "Start"
                             ]
 
-                            Bulma.button [
-                                button.isPrimary
+                            Bulma.button.a [
+                                color.isPrimary
                                 button.isLarge
                                 prop.style [ style.fontSize 20 ; style.color.red]
                                 prop.onClick (fun _ -> dispatchI (DeleteAllOtherPlayers state.Player))
