@@ -127,30 +127,30 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
             Html.div[
                 Bulma.field.p [
                     prop.style[style.padding 30; style.outlineColor color.darkSlateBlue; style.outlineWidth 2; style.outlineStyle.double]
-                    prop.children[
-                        Html.div[
-                            Checkradio.radio [
-                               prop.style[style.padding 10]
-                               prop.id "myradio1"
-                               prop.name "radio"
-                               prop.onCheckedChange (fun _ -> dispatchS (ChangeView SimpleView))
-                               prop.isChecked (game.ViewState = SimpleView)
-                               prop.key "SimpleCR"
-                            ]
-                            Html.label [ prop.htmlFor "myradio1"; prop.text "Simple View"; prop.style[style.padding 15; style.paddingRight 10]]
-                        ]
-                        Html.div[
-                            Checkradio.radio [
-                               prop.style[style.padding 10]
-                               prop.id "myradio2"
-                               prop.name "radio"
-                               prop.onCheckedChange (fun _ -> dispatchS (ChangeView AdvancedView))
-                               prop.isChecked (game.ViewState = AdvancedView)
-                               prop.key "AdvancedCR"
-                            ]
-                            Html.label [ prop.htmlFor "myradio2"; prop.text "Advanced View"; prop.style[style.padding 15; style.paddingRight 10]]
-                        ]
-                    ]
+                    //prop.children[
+                    //    Html.div[
+                    //        Checkradio.radio [
+                    //           prop.style[style.padding 10]
+                    //           prop.id "myradio1"
+                    //           prop.name "radio"
+                    //           prop.onCheckedChange (fun _ -> dispatchS (ChangeView SimpleView))
+                    //           prop.isChecked (game.ViewState = SimpleView)
+                    //           prop.key "SimpleCR"
+                    //        ]
+                    //        Html.label [ prop.htmlFor "myradio1"; prop.text "Simple View"; prop.style[style.padding 15; style.paddingRight 10]]
+                    //    ]
+                    //    Html.div[
+                    //        Checkradio.radio [
+                    //           prop.style[style.padding 10]
+                    //           prop.id "myradio2"
+                    //           prop.name "radio"
+                    //           prop.onCheckedChange (fun _ -> dispatchS (ChangeView AdvancedView))
+                    //           prop.isChecked (game.ViewState = AdvancedView)
+                    //           prop.key "AdvancedCR"
+                    //        ]
+                    //        Html.label [ prop.htmlFor "myradio2"; prop.text "Advanced View"; prop.style[style.padding 15; style.paddingRight 10]]
+                    //    ]
+                    //]
                 ]
 
                 Html.div[
