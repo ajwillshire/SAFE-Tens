@@ -66,29 +66,29 @@ let actorSystem = spawnActors
 //let tensRouter = router {post "/api/messages" forwardMessageToActor}
 
 let mainChannel = channel {
-        join (fun ctx socketId ->
+        join (fun ctx clientInfo ->
             task {
-            printfn "Connected! Main Socket Id: %O" socketId
+            printfn "Connected! Main Socket Id: %O" clientInfo.SocketId
             let hub = ctx.GetService<Channels.ISocketHub>()
 
             webSocketHub <- Some hub
 
             task {
                 do! Task.Delay 500
-                let m = (SocketID socketId |> (SetChannelSocketId >> SysMsg))
-                do! (sendMessageViaHub socketId m "Problem sending SocketId")
+                let m = (SocketID clientInfo.SocketId |> (SetChannelSocketId >> SysMsg))
+                do! (sendMessageViaHub clientInfo.SocketId m "Problem sending SocketId")
                 } |> ignore
             return Channels.Ok })
 
 
-        handle "" (fun ctx message ->
+        handle "" (fun ctx clientInfo message ->
                 task {
                     let message = message.Payload |> string |> Decode.Auto.unsafeFromString<Msg>
 
                     //All requests go to the gamesMaster
                     select  "/user/gamesMaster" actorSystem <! message
                 })
-        terminate (fun ctx ->
+        terminate (fun ctx clientInfo ->
                         task {
                             let x = "Someone"
                             
