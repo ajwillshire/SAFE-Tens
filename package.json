@@ -30,8 +30,6 @@
     },
     "dependencies": {
         "bulma": "0.8.0",
-        "bulma-checkradio": "1.1.1",
-        "bulma-quickview": "2.0.0",
         "react": "16.11.0",
         "react-dom": "16.11.0",
         "recharts": "^1.7.1"
