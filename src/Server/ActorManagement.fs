@@ -58,7 +58,7 @@ let getHighScores scoreList = scoreList
 
 let gamesMaster (mailbox: Actor<Msg>) =
 
-    let gamesMasterPersona = {playerName = setPlayerName "GamesMaster"; playerId = PlayerId None; socketId = None; orphaned = false}
+    let gamesMasterPersona = {playerName = setPlayerName "GamesMaster"; playerId = PlayerId None; socketId = SocketID Guid.Empty; orphaned = false}
 
     let consoleWriter = select "/user/consoleWriter" mailbox.Context
     consoleWriter <<! ("The GamesMaster is Alive!!", ConsoleColor.Magenta)

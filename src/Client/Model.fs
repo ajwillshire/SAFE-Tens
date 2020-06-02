@@ -31,6 +31,9 @@ type ModelState =
     | Running of Running 
     | FinishedGame of GameOver
 
+
+type BroadcastMode = ViaWebSocket | ViaHTTP
+
 type Model =
     {
     Player : Player
@@ -38,17 +41,17 @@ type Model =
     GameSystemData : GameSystemData
     ViewState : ViewState
     ConnectionState : ConnectionState
-    ConnectViaSocket : bool
+    CommunicationMode: BroadcastMode
     }
 
 
 
-let private noPlayer = {socketId = None; playerId = PlayerId None; playerName = PlayerName None; orphaned = false}
+let private noPlayer = {socketId = SocketID Guid.Empty; playerId = PlayerId None; playerName = PlayerName None; orphaned = false}
 let private blankExtras = {PlayerHighScore = Score 0; SystemHighScores = []}
 
 let private newGame (model:Model) = {model with ModelState = Running {Numbers = RandomNumbers []; Clicked = ClickedNumbers []; Points = Score 0}} //;
 
-let initialModel = {ModelState = NotStarted; Player = noPlayer; GameSystemData = blankExtras; ViewState = SimpleView; ConnectionState = DisconnectedFromServer; ConnectViaSocket = false}
+let initialModel = {ModelState = NotStarted; Player = noPlayer; GameSystemData = blankExtras; ViewState = SimpleView; ConnectionState = DisconnectedFromServer; CommunicationMode = BroadcastMode.ViaWebSocket}
 
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> = initialModel, Cmd.none
@@ -74,9 +77,9 @@ let sendPMToServerWS(game:Model) (msg:Msg) = let pm = PlayerMessage {msg = msg; 
 
 let sendPMToServer(game:Model) (msg:Msg) =
 
-    match game.ConnectViaSocket with
-    | true -> (sendPMToServerWS game msg)
-    | false -> (sendPMToServerAPI game msg)
+    match game.CommunicationMode with
+    | BroadcastMode.ViaWebSocket -> (sendPMToServerWS game msg)
+    | BroadcastMode.ViaHTTP -> (sendPMToServerAPI game msg)
 
 let forwardToServer (game:Model) (msg:Msg) = game, sendPMToServer game msg
 
@@ -166,7 +169,7 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
     | state, SysMsg s ->
         match state, s with
                 | _, SetChannelSocketId g ->
-                    let newPlayer = {game.Player with socketId = Some g} //Will get the playerId from the Server in due course
+                    let newPlayer = {game.Player with socketId = g} //Will get the playerId from the Server in due course
                     let cmd1 = Cmd.ofMsg (("Channel socket Id is " + string g) |> (Simple >> WriteToConsole))
                     {game with Player = newPlayer}, cmd1
 
@@ -195,9 +198,9 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
 
                 | _, KeyPress _ -> withoutCommands <| game
 
-                | _, CloseEvent _ -> match game.ConnectViaSocket with
-                                        | false -> (forwardToServer game msg) //Because the server close will not be triggered by the websocket closing
-                                        | true -> withoutCommands <| game
+                | _, CloseEvent _ -> match game.CommunicationMode with
+                                        | BroadcastMode.ViaHTTP -> (forwardToServer game msg) //Because the server close will not be triggered by the websocket closing
+                                        | BroadcastMode.ViaWebSocket -> withoutCommands <| game
 
 
     | _ ->    withoutCommands <| game

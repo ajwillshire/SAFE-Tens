@@ -30,20 +30,18 @@ module Channel =
 
             let rec connect () =
                 let url = "ws://localhost:8085/channel"
-
-                if model.ConnectViaSocket then
-                    let ws = WebSocket.Create(url)
-                    ws.onmessage <- onWebSocketMessage
-                    ws.onopen <- (fun ev ->
-                        dispatch (SysMsg (ConnectionChange (ConnectedToServer (buildWsSender ws))))
-                        printfn "WebSocket opened")
-                    ws.onclose <- (fun ev ->
-                        dispatch (SysMsg (ConnectionChange DisconnectedFromServer))
-                        printfn "WebSocket closed. Retrying connection"
-                        promise { 
-                            do! Promise.sleep 2000
-                            dispatch (SysMsg (ConnectionChange Connecting))
-                            connect() })
+                let ws = WebSocket.Create(url)
+                ws.onmessage <- onWebSocketMessage
+                ws.onopen <- (fun ev ->
+                    dispatch (SysMsg (ConnectionChange (ConnectedToServer (buildWsSender ws))))
+                    printfn "WebSocket opened")
+                ws.onclose <- (fun ev ->
+                    dispatch (SysMsg (ConnectionChange DisconnectedFromServer))
+                    printfn "WebSocket closed. Retrying connection"
+                    promise { 
+                        do! Promise.sleep 2000
+                        dispatch (SysMsg (ConnectionChange Connecting))
+                        connect() })
             connect()
 
         Cmd.ofSub sub
@@ -75,8 +73,8 @@ module CustomEncoders =
         extrasIn |> Extra.withCustom simpleEncoder simpleDecoder
         
     let inline buildExtras<'a> extraCoders =
-        let myEncoder:Encoder<'a> = Encode.Auto.generateEncoder(extra = extraCoders)
-        let myDecoder:Decoder<'a> = Decode.Auto.generateDecoder(extra = extraCoders)
+        let myEncoder:Encoder<'a> = Encode.Auto.generateEncoder(extra = extraCoders, caseStrategy = CaseStrategy.CamelCase)
+        let myDecoder:Decoder<'a> = Decode.Auto.generateDecoder(extra = extraCoders, caseStrategy = CaseStrategy.CamelCase)
         (myEncoder, myDecoder)
 
 let extras = Extra.empty

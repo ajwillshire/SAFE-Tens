@@ -31,16 +31,16 @@ module TensTypes =
     let setSocketID s = SocketID s
     let getSocketID (SocketID n) = n
 
-    let getOptionSocketID (s:SocketID option) = match s with
-                                                | Some z -> getSocketID z
-                                                | None -> Guid.Empty
+    //let getOptionSocketID (s:SocketID option) = match s with
+    //                                            | Some z -> getSocketID z
+    //                                            | None -> Guid.Empty
 
 
     type Player =
         {
         playerName:PlayerName
         playerId:PlayerId
-        socketId:SocketID option
+        socketId:SocketID
         orphaned:Boolean
         }
 
@@ -173,7 +173,7 @@ module MessageTypes =
         | SetPlayerId of int
         | ChangeView of ViewState
         | KeyPress of string
-        | CloseEvent of SocketID option
+        | CloseEvent of SocketID
 
     and  ConnectionState =
         | DisconnectedFromServer

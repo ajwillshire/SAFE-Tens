@@ -84,7 +84,7 @@ let mainChannel = channel {
                 })
         terminate (fun ctx clientInfo ->
                         task {
-                            let message = (Some(SocketID clientInfo.SocketId) |> (CloseEvent >> SysMsg))
+                            let message = (SocketID clientInfo.SocketId |> (CloseEvent >> SysMsg))
                             select  "/user/gamesMaster" actorSystem <! message
 
                             Console.WriteLine (sprintf "The user on %s closed the socket." (string clientInfo.SocketId))

@@ -293,12 +293,12 @@ let mailMan (player:Player) (mailbox: Actor<Msg>) =
                                 | _ -> ()
 
             // If someone sends us data then we need to send it client-side as a Msg.
-            | GameData g -> do Channel.sendMessageViaHub (getOptionSocketID player.socketId) (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
+            | GameData g -> do Channel.sendMessageViaHub (getSocketID player.socketId) (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
                             consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s GameData received by MailMan" (string g)) ConsoleColor.DarkRed}
 
             | WriteToConsole m -> consoleWriter <!% {sender = player; msg = WriteToConsole m}
 
-            | PlayerMessage pm ->   do Channel.sendMessageViaHub (getOptionSocketID player.socketId) message (sprintf "Communications Error %s" (string pm)) |> ignore
+            | PlayerMessage pm ->   do Channel.sendMessageViaHub (getSocketID player.socketId) message (sprintf "Communications Error %s" (string pm)) |> ignore
                                     consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "MailMan has received message from %s" (getPlayerName pm.sender.playerName)) ConsoleColor.Blue}
                                     match pm.msg with
                                     | GameData g -> match g with
@@ -307,7 +307,7 @@ let mailMan (player:Player) (mailbox: Actor<Msg>) =
                                     | _ -> ()
 
             // If someone sends us data then we need to send it client-side as a Msg.
-            | SysMsg s -> do Channel.sendMessageViaHub (getOptionSocketID player.socketId) (SysMsg s) (sprintf "Communications Error %s" (string s)) |> ignore
+            | SysMsg s -> do Channel.sendMessageViaHub (getSocketID player.socketId) (SysMsg s) (sprintf "Communications Error %s" (string s)) |> ignore
                           consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s SysData received by MailMan" (string s)) ConsoleColor.DarkRed}
 
         return! loop ()
