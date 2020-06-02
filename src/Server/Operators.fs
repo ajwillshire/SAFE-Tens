@@ -11,7 +11,7 @@ open TensTypes
 //Add an operator to allow sending a PoisonPill
 let (<!!!) a (b:PoisonPill) = a <! b
 
-//Overload <! to ensure that only a Msg can be sent using <! (except for the PoisonPil Exception)
+//Overload <! to ensure that only a Msg can be sent using <! (except for the PoisonPill Exception)
 let (<!) a (b:Msg) = a<!b
 
 //Add a new operator to make it simpler to pass instructions around the place - Msg | Instruction
@@ -26,3 +26,6 @@ let (<!%) a (b:PlayerMessage) = a <! (PlayerMessage b)
 let cnslMsg m (c:System.ConsoleColor) = WriteToConsole({msg = m; colour = int c} |> Complex)
 
 let (<<!)  a (m,c) = a <! cnslMsg m c
+
+
+

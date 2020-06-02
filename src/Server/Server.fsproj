@@ -21,5 +21,10 @@
       <PackageReference Include="Fable.Remoting.Saturn" Version="1.2.0" />
       <PackageReference Include="FSharp.Compiler.Service" Version="31.0.0" />
     </ItemGroup>
+    <ItemGroup>
+      <Reference Include="Saturn">
+        <HintPath>..\..\..\Saturn\src\Saturn\bin\Debug\netcoreapp3.1\Saturn.dll</HintPath>
+      </Reference>
+    </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

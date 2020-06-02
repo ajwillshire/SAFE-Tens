@@ -4,9 +4,6 @@ open Browser.Types
 open Elmish
 open Elmish.React
 open Thoth.Json
-
-open Fable.Core
-
 open Shared
 open MessageTypes
 
@@ -17,20 +14,13 @@ module Channel =
 
     let inline decode<'a> x = x |> unbox<string> |> Decode.Auto.unsafeFromString<'a>
 
-    //type WsSender = Msg -> Unit
-
-
-
-
-
     let buildWsSender (ws:WebSocket) : WsSender =
         fun (message:Msg) ->
             let message = {| Topic = ""; Ref = ""; Payload = message |}
             let message = Thoth.Json.Encode.Auto.toString(0, message)
             ws.send message
 
-
-    let subscription _ =
+    let subscription (model:Model.Model) =
         let sub dispatch =
             let onWebSocketMessage (msg:MessageEvent) =
                 let msg = msg.data |> decode<ChannelMessage>
@@ -40,28 +30,29 @@ module Channel =
 
             let rec connect () =
                 let url = "ws://localhost:8085/channel"
-                let ws = WebSocket.Create(url)
-                ws.onmessage <- onWebSocketMessage
-                ws.onopen <- (fun ev ->
-                    dispatch (SysMsg (ConnectionChange (ConnectedToServer (buildWsSender ws))))
-                    printfn "WebSocket opened")
-                ws.onclose <- (fun ev ->
-                    dispatch (SysMsg (ConnectionChange DisconnectedFromServer))
-                    printfn "WebSocket closed. Retrying connection"
-                    promise { 
-                        do! Promise.sleep 2000
-                        dispatch (SysMsg (ConnectionChange Connecting))
-                        connect() })
 
+                if model.ConnectViaSocket then
+                    let ws = WebSocket.Create(url)
+                    ws.onmessage <- onWebSocketMessage
+                    ws.onopen <- (fun ev ->
+                        dispatch (SysMsg (ConnectionChange (ConnectedToServer (buildWsSender ws))))
+                        printfn "WebSocket opened")
+                    ws.onclose <- (fun ev ->
+                        dispatch (SysMsg (ConnectionChange DisconnectedFromServer))
+                        printfn "WebSocket closed. Retrying connection"
+                        promise { 
+                            do! Promise.sleep 2000
+                            dispatch (SysMsg (ConnectionChange Connecting))
+                            connect() })
             connect()
 
         Cmd.ofSub sub
 
 module WindowEvents =
-    let unloadSub _ =
+    let unloadSub (model:Model.Model) =
         let setUnloadEvent dispatch = 
-            Browser.Dom.window.onbeforeunload <- (fun _ -> dispatch (Instruction KillMeNow))
-            
+            Browser.Dom.window.onbeforeunload <- (fun _ -> dispatch (SysMsg (CloseEvent model.Player.socketId)))
+
         Cmd.ofSub setUnloadEvent
 
 module KeyboardEvents =

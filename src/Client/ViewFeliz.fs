@@ -233,18 +233,18 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
         prop.children[
 
             Html.h2 [prop.style [ style.padding 40 ]]
-            Html.h2 (sprintf "Final Score: %i" (getScoreValue gameOver.finalScore))
-            Html.h2 (sprintf "Reason for failure: %s" (match gameOver.failReason with
+            Html.h2 (sprintf "Final Score: %i" (getScoreValue gameOver.FinalScore))
+            Html.h2 (sprintf "Reason for failure: %s" (match gameOver.FailReason with
                                                                             | FailMessage.OverTen -> "Those numbers exceeded 10"
                                                                             | FailMessage.TooManyNumbers -> "There were just too many numbers!"
-                                                                            | FailMessage.HardStop -> match gameOver.culprit with
+                                                                            | FailMessage.HardStop -> match gameOver.Culprit with
                                                                                                         | Some p -> sprintf "%s pulled the plug on your game!" (getPlayerName p.playerName)
                                                                                                         | None -> "An unknown person pulled the plug on your game"
                                                                             | Ended -> "You quit!"
                                                                             ))
             Html.h2 [prop.style [ style.padding 40 ]]
 
-            match gameOver.failReason with
+            match gameOver.FailReason with
                         //HardStop means that your Actors were deleted - no prospect of Restarting
                         | FailMessage.HardStop _ -> makeButton "Re-Register" (fun _ -> dispatchI ReRegister) 
                         | _ ->
@@ -263,7 +263,7 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
                     prop.children[
                         thead[] [makeTableHeaderRow]
                         tbody [] [
-                            yield! game.GameSystemData.SystemHighScores |> List.map (fun r -> makeTableRow r)
+                            yield! game.GameSystemData.SystemHighScores |> List.map makeTableRow
                         ]
                         tfoot[][]
                     ]

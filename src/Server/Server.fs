@@ -19,17 +19,6 @@ open Channel
 open ActorManagement
 open Saturn.Channels
 
-//module UnitEncoder =
-
-//    let encoder = fun _ -> JsonValue.Parse("null")
-//    let decoder = fun _ _ -> Result.Ok()
-
-//    let extraCoders =
-//        Extra.empty
-//        |> Extra.withCustom encoder decoder
-        
-//    let serializer = ThothSerializer(extra = extraCoders)
-
 
 let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" -> None | x -> Some x
 
@@ -42,28 +31,33 @@ let port =
 //Initialise the actor system
 let actorSystem = spawnActors
 
-//let forwardMessageToActor next (ctx:HttpContext)= task {
-//    let! message = ctx.BindModelAsync<Msg>()
+//API Routing
+let forwardMessageToActor next (ctx:HttpContext)= task {
+    let! message = ctx.BindModelAsync<Msg>()
     
-//    let hub = ctx.GetService<Saturn.Channels.ISocketHub>()
-//    Console.WriteLine ("Socket used is " + string hub)
+    let hub = ctx.GetService<Saturn.Channels.ISocketHub>()
+    Console.WriteLine ("Socket used is " + string hub)
 
-//    match message with
-//    | PlayerMessage p -> Console.WriteLine ("(S) PlayerID is " + string p.sender.playerId)
-//    | _ -> Console.WriteLine ("Non PlayerMessage Received")
+    match message with
+    | PlayerMessage p -> Console.WriteLine ("(S) PlayerID is " + string p.sender.playerId)
+    | _ -> Console.WriteLine ("Non PlayerMessage Received")
 
-//    //All requests go to the gamesMaster
-//    select  "/user/gamesMaster" actorSystem <! message
+    //All requests go to the gamesMaster
+    select  "/user/gamesMaster" actorSystem <! message
 
-//    //Send a Msg as a response (this could be an Instruction, Data or just a message)
-//    let reply = match message with
-//                    | PlayerMessage p -> Simple ("Message being forwarded..." + string p.sender.playerId) |> WriteToConsole
-//                    | _ -> Simple ("Non PlayerMessage Received") |> WriteToConsole
+    //Send a Msg as a response (this could be an Instruction, Data or just a message)
+    let reply = match message with
+                    | PlayerMessage p -> Simple ("Message being forwarded..." + string p.sender.playerId) |> WriteToConsole
+                    | _ -> Simple ("Non PlayerMessage Received") |> WriteToConsole
 
-//    return! json reply next ctx }
+    return! json reply next ctx }
 
 
-//let tensRouter = router {post "/api/messages" forwardMessageToActor}
+let tensRouter = router {post "/api/messages" forwardMessageToActor}
+
+//******************************
+
+//Websockets
 
 let mainChannel = channel {
         join (fun ctx clientInfo ->
@@ -90,17 +84,18 @@ let mainChannel = channel {
                 })
         terminate (fun ctx clientInfo ->
                         task {
-                            let x = "Someone"
-                            
-                            Console.WriteLine (sprintf "%s was terminated." x)
-                            ()
+                            let message = (Some(SocketID clientInfo.SocketId) |> (CloseEvent >> SysMsg))
+                            select  "/user/gamesMaster" actorSystem <! message
+
+                            Console.WriteLine (sprintf "The user on %s closed the socket." (string clientInfo.SocketId))
+
                         })
      }
 
 let app = application {
     url ("http://0.0.0.0:" + port.ToString() + "/")
-    //use_router tensRouter
-    no_router
+    use_router tensRouter
+    //no_router
     add_channel "/channel" mainChannel
     memory_cache
     use_static publicPath

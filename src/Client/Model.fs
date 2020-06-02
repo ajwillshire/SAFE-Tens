@@ -1,7 +1,6 @@
 module Model
 
 open Elmish
-open Thoth.Fetch
 open System
 
 //Solution References
@@ -9,6 +8,7 @@ open Shared
 open CommTypes
 open TensTypes
 open MessageTypes
+open Thoth.Fetch
 
 
 //These types are purely local to the Elmish part of the Application
@@ -21,9 +21,9 @@ type Running =
 
 type GameOver =
     {
-     finalScore : Score
-     failReason : FailMessage
-     culprit : Player option
+     FinalScore : Score
+     FailReason : FailMessage
+     Culprit : Player option
     }
 
 type ModelState =
@@ -37,44 +37,48 @@ type Model =
     ModelState : ModelState
     GameSystemData : GameSystemData
     ViewState : ViewState
-    ConnectionState : ConnectionState 
+    ConnectionState : ConnectionState
+    ConnectViaSocket : bool
     }
 
 
 
-let private noPlayer = {socketId = SocketID Guid.Empty; playerId = PlayerId None; playerName = PlayerName None}
+let private noPlayer = {socketId = None; playerId = PlayerId None; playerName = PlayerName None; orphaned = false}
 let private blankExtras = {PlayerHighScore = Score 0; SystemHighScores = []}
 
 let private newGame (model:Model) = {model with ModelState = Running {Numbers = RandomNumbers []; Clicked = ClickedNumbers []; Points = Score 0}} //;
 
-let initialModel = {ModelState = NotStarted; Player = noPlayer; GameSystemData = blankExtras; ViewState = SimpleView; ConnectionState = DisconnectedFromServer}
+let initialModel = {ModelState = NotStarted; Player = noPlayer; GameSystemData = blankExtras; ViewState = SimpleView; ConnectionState = DisconnectedFromServer; ConnectViaSocket = false}
 
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> = initialModel, Cmd.none
 
 let private withoutCommands model = model, Cmd.none
 
-//let sendPMToServerX(game:Model) (msg:Msg) = let pm = PlayerMessage {msg = msg; sender = game.Player}
-//                                            let cmd = Cmd.OfPromise.either (fun () -> Fetch.post ("/api/messages", pm)) () //Thing to do
-//                                                                          (fun(m) -> m)                                    //Message if it succeeds
-//                                                                          (fun(e) -> (Error >> WriteToConsole) e)          //Message if it fails
-//                                            cmd
+//Comms implementation with API
 
-//let forwardToServerX (game:Model) (msg:Msg) = game, sendPMToServerX game msg
+let sendPMToServerAPI(game:Model) (msg:Msg) = let pm = PlayerMessage {msg = msg; sender = game.Player}
+                                              Cmd.OfPromise.either (fun () -> Fetch.post ("/api/messages", pm)) () //Thing to do
+                                                                   (fun(m) -> (Simple >> WriteToConsole) (string m))                                    //Message if it succeeds (gets response from Server-side)
+                                                                   (fun(e) -> (Error >> WriteToConsole) e)          //Message if it fails
 
+//Comms implementation with websockets
 
-//Trying to implement with websockets *******************************************************
-
-let sendPMToServer(game:Model) (msg:Msg) =    let pm = PlayerMessage {msg = msg; sender = game.Player}
-                                              match game.ConnectionState with
+let sendPMToServerWS(game:Model) (msg:Msg) = let pm = PlayerMessage {msg = msg; sender = game.Player}
+                                             match game.ConnectionState with
                                                             | ConnectedToServer s -> s pm |> ignore
                                                             | _ -> ()
-                                              Cmd.none
-
-let forwardToServer (game:Model) (msg:Msg) = game, sendPMToServer game msg
-
+                                             Cmd.ofMsg ((Simple >> WriteToConsole) "Message sent on WS")
 
 // ************************************************************
+
+let sendPMToServer(game:Model) (msg:Msg) =
+
+    match game.ConnectViaSocket with
+    | true -> (sendPMToServerWS game msg)
+    | false -> (sendPMToServerAPI game msg)
+
+let forwardToServer (game:Model) (msg:Msg) = game, sendPMToServer game msg
 
 
 // The update function computes the next state of the application based on the current state and the incoming events/messages
@@ -117,8 +121,6 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                                                             Player = {game.Player with playerId = PlayerId None;
                                                                                        playerName = PlayerName None}}, Cmd.none
 
-
-
                 //All other commands get sent to the Server
                 | _, _ -> forwardToServer game msg
 
@@ -140,7 +142,7 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                 | _, ScoreLogs l -> withoutCommands <| {game with GameSystemData = {game.GameSystemData with SystemHighScores = l}}
 
                 | Running state, Fail f ->
-                    let finishedGame = {game with ModelState = FinishedGame {finalScore= state.Points; failReason = f; culprit = None}}
+                    let finishedGame = {game with ModelState = FinishedGame {FinalScore= state.Points; FailReason = f; Culprit = None}}
                     match f with
                     | TooManyNumbers -> finishedGame, Cmd.ofMsg("Too many numbers in random set." |> (Simple >> WriteToConsole))
                     | OverTen -> finishedGame, Cmd.ofMsg("The sum of total clicked numbers exceeded ten." |> (Simple >> WriteToConsole))
@@ -154,7 +156,7 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
 
                                             match pm.msg with
                                             | GameData g -> match g with
-                                                            | Fail (HardStop) -> let finishedGame = {game with ModelState = FinishedGame {finalScore= state.Points; failReason = HardStop; culprit = Some pm.sender}}
+                                                            | Fail (HardStop) -> let finishedGame = {game with ModelState = FinishedGame {FinalScore= state.Points; FailReason = HardStop; Culprit = Some pm.sender}}
                                                                                  finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by %s" (getPlayerName pm.sender.playerName)) |> (Simple >> WriteToConsole))
 
                                                             | _ -> withoutCommands <| game
@@ -164,7 +166,7 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
     | state, SysMsg s ->
         match state, s with
                 | _, SetChannelSocketId g ->
-                    let newPlayer = {game.Player with socketId = g} //Will get the playerId from the Server in due course
+                    let newPlayer = {game.Player with socketId = Some g} //Will get the playerId from the Server in due course
                     let cmd1 = Cmd.ofMsg (("Channel socket Id is " + string g) |> (Simple >> WriteToConsole))
                     {game with Player = newPlayer}, cmd1
 
@@ -193,7 +195,9 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
 
                 | _, KeyPress _ -> withoutCommands <| game
 
-                | _, CloseEvent -> forwardToServer game msg
+                | _, CloseEvent _ -> match game.ConnectViaSocket with
+                                        | false -> (forwardToServer game msg) //Because the server close will not be triggered by the websocket closing
+                                        | true -> withoutCommands <| game
 
 
     | _ ->    withoutCommands <| game

@@ -31,12 +31,17 @@ module TensTypes =
     let setSocketID s = SocketID s
     let getSocketID (SocketID n) = n
 
+    let getOptionSocketID (s:SocketID option) = match s with
+                                                | Some z -> getSocketID z
+                                                | None -> Guid.Empty
+
 
     type Player =
         {
         playerName:PlayerName
         playerId:PlayerId
-        socketId:SocketID
+        socketId:SocketID option
+        orphaned:Boolean
         }
 
     let getSafePlayerName (p:Player) = (getPlayerName p.playerName).Replace(" ", "_") + "_" + string (match getPlayerId p.playerId with | Some n -> n | None -> -1)
@@ -168,11 +173,11 @@ module MessageTypes =
         | SetPlayerId of int
         | ChangeView of ViewState
         | KeyPress of string
-        | CloseEvent
+        | CloseEvent of SocketID option
 
     and  ConnectionState =
         | DisconnectedFromServer
-        | ConnectedToServer of WsSender //WsSender
+        | ConnectedToServer of WsSender
         | Connecting
 
         member this.IsConnected =

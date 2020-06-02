@@ -49,11 +49,16 @@ let consoleWriter (mailbox: Actor<Msg>) =
     loop ()
 
 
+let getHighScores scoreList = scoreList
+                                |> List.sortByDescending(fun a -> a.highScore)
+                                |> List.truncate(5)
+
+
 
 
 let gamesMaster (mailbox: Actor<Msg>) =
 
-    let gamesMasterPersona = {playerName = setPlayerName "GamesMaster"; playerId = PlayerId None; socketId = SocketID Guid.Empty}
+    let gamesMasterPersona = {playerName = setPlayerName "GamesMaster"; playerId = PlayerId None; socketId = None; orphaned = false}
 
     let consoleWriter = select "/user/consoleWriter" mailbox.Context
     consoleWriter <<! ("The GamesMaster is Alive!!", ConsoleColor.Magenta)
@@ -83,6 +88,7 @@ let gamesMaster (mailbox: Actor<Msg>) =
 
                                                 let newPlayerActor = spawn mailbox.Context.System playerName (playerActor updatedPlyr) 
                                                 newPlayerActor <! SysMsg (SetPlayerId playerNumber)
+                                                newPlayerActor <!& ScoreLogs (getHighScores highScores)
 
                                                 let newList = players @ [updatedPlyr]
                                                 consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg  ("New player registered - " + playerName + " - " + string playerNumber + " (Number of active players: " + (string newList.Length) + ")") ConsoleColor.Magenta}
@@ -98,8 +104,15 @@ let gamesMaster (mailbox: Actor<Msg>) =
                                                             consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg ("All other players deleted!!") ConsoleColor.Red}
                                                             return! loop ([p],highScores)
 
-                | SysMsg CloseEvent -> consoleWriter <<! ("Close event received", ConsoleColor.Cyan)
-                                       return! loop (players, highScores)
+                | SysMsg (CloseEvent s) -> consoleWriter <<! ("Close event received from " + getSafePlayerName m.sender, ConsoleColor.Cyan)
+                                           let thisPlayer = players |> List.filter (fun x -> x.socketId = s) |> List.head
+                                           let updatedPlayer = {thisPlayer with orphaned = true} |> List.singleton
+                                           let otherPlayers = players |> List.filter (fun x -> x.socketId <> s)
+                                           let thisActor = select ("user/"+ (getSafePlayerName m.sender)) mailbox.Context.System
+                                           [Instruction.StopRandom; Instruction.StopAuto] |> List.iter (fun z -> thisActor <!! z)
+                                           consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg (getPlayerName thisPlayer.playerName + " has been orphaned.") ConsoleColor.Red}
+
+                                           return! loop (otherPlayers @ updatedPlayer, highScores)
 
                 //An actor that has been told to "HardStop" will reply with a KillMeNow instruction
                 | Instruction KillMeNow ->  let player = select ("user/"+ (getSafePlayerName m.sender)) mailbox.Context.System
@@ -109,12 +122,9 @@ let gamesMaster (mailbox: Actor<Msg>) =
                                             consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg (getSafePlayerName m.sender + " has been killed.") ConsoleColor.Red}
                                             return! loop (newPlayers, highScores)
 
-                | GameData (HighScore h) -> let newHighScores = ([{playerName = getPlayerName m.sender.playerName; actorName = getSafePlayerName m.sender; highScore = h}] @ highScores)
-                                                                |> List.sortByDescending(fun a -> a.highScore)
-                                                                |> List.truncate(5)
+                | GameData (HighScore h) -> let newHighScores = getHighScores ([{playerName = getPlayerName m.sender.playerName; actorName = getSafePlayerName m.sender; highScore = h}] @ highScores)
 
-                                            let player = (select ("user/"+ (getSafePlayerName m.sender)) mailbox.Context.System)
-                                            player <!& ScoreLogs newHighScores
+                                            players |> List.iter (fun p ->(select ("user/"+ (getSafePlayerName p)) mailbox.Context.System)<!& ScoreLogs newHighScores)
 
                                             consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg (sprintf "Current High Scorer is %s with %i" newHighScores.[0].playerName (getScoreValue newHighScores.[0].highScore)) ConsoleColor.Red}
                                             return! loop (players, newHighScores)
@@ -135,6 +145,18 @@ let gamesMaster (mailbox: Actor<Msg>) =
 
                         return! loop(players, highScores)
 
+
+        | SysMsg (CloseEvent s) -> let thisPlayer = players |> List.filter (fun x -> x.socketId = s) |> List.tryHead
+                                   match thisPlayer with
+                                   | Some p -> consoleWriter <<! ("Close event received from " + getSafePlayerName p, ConsoleColor.Cyan)
+                                               let updatedPlayer = {p with orphaned = true}
+                                               let otherPlayers = players |> List.filter (fun x -> x.socketId <> s)
+                                               let thisActor = select ("user/"+ (getSafePlayerName p)) mailbox.Context.System
+                                               [Instruction.StopRandom; Instruction.StopAuto] |> List.iter (fun z -> thisActor <!! z)
+                                               consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg (getPlayerName p.playerName + " has been orphaned.") ConsoleColor.Red}
+                                               return! loop (otherPlayers @ [updatedPlayer], highScores)
+                                   | None -> consoleWriter <!% {sender = gamesMasterPersona; msg = cnslMsg  ("That player was not found") ConsoleColor.DarkRed}
+                                             return! loop(players, highScores)
 
         | _ -> return! loop(players, highScores)
     }
