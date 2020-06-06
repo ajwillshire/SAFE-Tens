@@ -20,7 +20,7 @@ module Channel =
             let message = Thoth.Json.Encode.Auto.toString(0, message)
             ws.send message
 
-    let subscription (model:Model.Model) =
+    let subscription =
         let sub dispatch =
             let onWebSocketMessage (msg:MessageEvent) =
                 let msg = msg.data |> decode<ChannelMessage>
@@ -30,6 +30,9 @@ module Channel =
 
             let rec connect () =
                 let url = "ws://localhost:8085/channel"
+
+                //if model.CommunicationMode = Model.BroadcastMode.ViaWebSocket then
+
                 let ws = WebSocket.Create(url)
                 ws.onmessage <- onWebSocketMessage
                 ws.onopen <- (fun ev ->
@@ -54,15 +57,15 @@ module WindowEvents =
         Cmd.ofSub setUnloadEvent
 
 module KeyboardEvents =
-    let keyPressSub _ =
+    let keyPressSub =
         let keyPress dispatch =
             Browser.Dom.window.onkeypress <- (fun a -> dispatch (SysMsg (KeyPress a.key)))
         Cmd.ofSub keyPress
 
 
 let subs model = Cmd.batch [WindowEvents.unloadSub model
-                            KeyboardEvents.keyPressSub model
-                            Channel.subscription model]
+                            KeyboardEvents.keyPressSub
+                            Channel.subscription]
 
 module CustomEncoders =
 
@@ -73,8 +76,8 @@ module CustomEncoders =
         extrasIn |> Extra.withCustom simpleEncoder simpleDecoder
         
     let inline buildExtras<'a> extraCoders =
-        let myEncoder:Encoder<'a> = Encode.Auto.generateEncoder(extra = extraCoders, caseStrategy = CaseStrategy.CamelCase)
-        let myDecoder:Decoder<'a> = Decode.Auto.generateDecoder(extra = extraCoders, caseStrategy = CaseStrategy.CamelCase)
+        let myEncoder:Encoder<'a> = Encode.Auto.generateEncoder(extra = extraCoders)
+        let myDecoder:Decoder<'a> = Decode.Auto.generateDecoder(extra = extraCoders)
         (myEncoder, myDecoder)
 
 let extras = Extra.empty

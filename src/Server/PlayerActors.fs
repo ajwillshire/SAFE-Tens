@@ -238,7 +238,7 @@ let currentGame (mailbox: Actor<Msg>) =
                                                   return! loop(currentScore)
 
                                 | IncrementScore x ->   let incrementedScore = getScoreValue currentScore + x
-                                                        if debug then mailMan <<! ((sprintf "Current score :%i" incrementedScore), ConsoleColor.DarkGreen)
+                                                        if debug then mailMan <<! ((sprintf "Current score: %i" incrementedScore), ConsoleColor.DarkGreen)
                                                         let newScore = Score incrementedScore
                                                         mailMan <!& ScoreUpdate newScore
                                                         return! loop(newScore)
@@ -269,50 +269,53 @@ let currentGame (mailbox: Actor<Msg>) =
 //Essentially functions as the Router
 let mailMan (player:Player) (mailbox: Actor<Msg>) =
 
-    let rec loop () = actor {
+    let rec loop (player:Player) = actor {
         let! message = mailbox.Receive ()
 
         let consoleWriter = select "/user/consoleWriter" mailbox.Context
 
         match message with
-            //If we receive an Instruction (probably but not necessarily from Client-side) we need to re-route it.
-            | Instruction i ->  consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s Instruction received by MailMan" (string i)) ConsoleColor.DarkRed}
-                                match i with
-                                | StartGame _ -> select "../currentGame"  mailbox.Context <! message
-                                | ClearNumbers -> select "../currentGame"  mailbox.Context <! message
+            | Instruction (UpdatePlayer p) ->   consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "Player Updated") ConsoleColor.DarkRed}
+                                                return! loop(p)
+            | _ -> match message with
+                        //If we receive an Instruction (probably but not necessarily from Client-side) we need to re-route it.
+                        | Instruction i ->  consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s Instruction received by MailMan" (string i)) ConsoleColor.DarkRed}
+                                            match i with
+                                            | StartGame _ -> select "../currentGame"  mailbox.Context <! message
+                                            | ClearNumbers -> select "../currentGame"  mailbox.Context <! message
 
-                                | StartRandom -> select "../scheduler"  mailbox.Context <! message
-                                | StopRandom -> select "../scheduler"  mailbox.Context <! message
+                                            | StartRandom -> select "../scheduler"  mailbox.Context <! message
+                                            | StopRandom -> select "../scheduler"  mailbox.Context <! message
 
-                                | NewClickedNumber _ -> select "../clickedHandler"  mailbox.Context <! message
+                                            | NewClickedNumber _ -> select "../clickedHandler"  mailbox.Context <! message
 
-                                | SingleAuto -> select "../auto"  mailbox.Context <! (Instruction Poke)
-                                | StartAuto -> select "../scheduler"  mailbox.Context <! message
-                                | StopAuto -> select "../scheduler"  mailbox.Context <! message
+                                            | SingleAuto -> select "../auto"  mailbox.Context <! (Instruction Poke)
+                                            | StartAuto -> select "../scheduler"  mailbox.Context <! message
+                                            | StopAuto -> select "../scheduler"  mailbox.Context <! message
 
-                                | _ -> ()
+                                            | _ -> ()
 
-            // If someone sends us data then we need to send it client-side as a Msg.
-            | GameData g -> do Channel.sendMessageViaHub (getSocketID player.socketId) (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
-                            consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s GameData received by MailMan" (string g)) ConsoleColor.DarkRed}
+                        // If someone sends us data then we need to send it client-side as a Msg.
+                        | GameData g -> do Channel.sendMessageViaHub (getSocketID player.socketId) (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
+                                        consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s GameData received by MailMan" (string g)) ConsoleColor.DarkRed}
 
-            | WriteToConsole m -> consoleWriter <!% {sender = player; msg = WriteToConsole m}
+                        | WriteToConsole m -> consoleWriter <!% {sender = player; msg = WriteToConsole m}
 
-            | PlayerMessage pm ->   do Channel.sendMessageViaHub (getSocketID player.socketId) message (sprintf "Communications Error %s" (string pm)) |> ignore
-                                    consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "MailMan has received message from %s" (getPlayerName pm.sender.playerName)) ConsoleColor.Blue}
-                                    match pm.msg with
-                                    | GameData g -> match g with
-                                                    | Fail (HardStop) -> select "../currentGame"  mailbox.Context <!& g
-                                                    | _ -> ()
-                                    | _ -> ()
+                        | PlayerMessage pm ->   do Channel.sendMessageViaHub (getSocketID player.socketId) message (sprintf "Communications Error %s" (string pm)) |> ignore
+                                                consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "MailMan has received message from %s" (getPlayerName pm.sender.playerName)) ConsoleColor.Blue}
+                                                match pm.msg with
+                                                | GameData g -> match g with
+                                                                | Fail (HardStop) -> select "../currentGame"  mailbox.Context <!& g
+                                                                | _ -> ()
+                                                | _ -> ()
 
-            // If someone sends us data then we need to send it client-side as a Msg.
-            | SysMsg s -> do Channel.sendMessageViaHub (getSocketID player.socketId) (SysMsg s) (sprintf "Communications Error %s" (string s)) |> ignore
-                          consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s SysData received by MailMan" (string s)) ConsoleColor.DarkRed}
+                        // If someone sends us data then we need to send it client-side as a Msg.
+                        | SysMsg s -> do Channel.sendMessageViaHub (getSocketID player.socketId) (SysMsg s) (sprintf "Communications Error %s" (string s)) |> ignore
+                                      consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s SysData received by MailMan" (string s)) ConsoleColor.DarkRed}
 
-        return! loop ()
+                   return! loop (player)
     }
-    loop ()
+    loop (player)
 
 
 let playerActor (playerSpec:Player) (mailbox : Actor<Msg>) =
@@ -334,7 +337,7 @@ let playerActor (playerSpec:Player) (mailbox : Actor<Msg>) =
     spawn mailbox.Context "auto" automaticPlayer |> ignore
 
     //Keep track of player's high score for the session
-    let rec loop (highScore:Score) = actor {
+    let rec loop (player:Player, highScore:Score) = actor {
 
         let! message = mailbox.Receive()
 
@@ -343,13 +346,16 @@ let playerActor (playerSpec:Player) (mailbox : Actor<Msg>) =
         match message with
         | GameData (HighScore h) -> if (getScoreValue h) > (getScoreValue highScore) then
                                         mailMan <! cnslMsg (sprintf "New high score of %i" (getScoreValue h)) ConsoleColor.DarkGreen
-                                        gamesMaster <!% {sender = playerSpec; msg = message}
-                                        return! loop(h)
-                                    else return! loop(highScore)
+                                        gamesMaster <!% {sender = player; msg = message}
+                                        return! loop(player, h)
+                                    else return! loop(player, highScore)
+
+        | Instruction (UpdatePlayer p) ->   mailMan <! message
+                                            return! loop(p, highScore)
 
         //Anything else is forwarded on to the MailMan
         | _ -> mailMan <! message
-               return! loop(highScore)
+               return! loop(player, highScore)
         
     }
-    loop(Score 0)
+    loop(playerSpec, Score 0)

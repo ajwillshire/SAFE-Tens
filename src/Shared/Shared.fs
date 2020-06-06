@@ -24,32 +24,42 @@ module TensTypes =
                                         | Some s -> s
                                         | None -> ""
 
+    type ActorName = ActorName of string option
 
+    let setActorName (name:PlayerName) (id:PlayerId) = ActorName (Some ((getPlayerName name).Replace(" ", "_") + "_" + string (match getPlayerId id with | Some n -> n | None -> -1)))
+    let getActorName (ActorName n) = match n with
+                                        | Some s -> s
+                                        | None -> ""
 
     type SocketID = SocketID of Guid
 
     let setSocketID s = SocketID s
     let getSocketID (SocketID n) = n
 
-    //let getOptionSocketID (s:SocketID option) = match s with
-    //                                            | Some z -> getSocketID z
-    //                                            | None -> Guid.Empty
-
 
     type Player =
         {
         playerName:PlayerName
+        actorName:ActorName
         playerId:PlayerId
         socketId:SocketID
         orphaned:Boolean
         }
+        member this.refName = getActorName this.actorName
 
-    let getSafePlayerName (p:Player) = (getPlayerName p.playerName).Replace(" ", "_") + "_" + string (match getPlayerId p.playerId with | Some n -> n | None -> -1)
+    //let getSafePlayerName (p:Player) = (getPlayerName p.playerName).Replace(" ", "_") + "_" + string (match getPlayerId p.playerId with | Some n -> n | None -> -1)
+
+    let makeNewPlayer (name:string) (id: int) (socketId:Guid) =
+        let myName = PlayerName (Some name)
+        let myId = PlayerId (Some id)
+        {playerName = myName; actorName = (setActorName myName myId); playerId = myId; socketId = SocketID socketId; orphaned = false}
+
 
     type GameSystemData =
         {
          PlayerHighScore : Score
          SystemHighScores : ScoreLog list
+         Players : Player list
         }
 
     type GameConfig =
@@ -128,8 +138,10 @@ module MessageTypes =
         | SysMsg of SysMsg
 
     and Instruction =
-        | NewPlayer of Player
+        | NewPlayer //of Player
         | UpdatePlayerName of string
+        | AdoptPlayer of PlayerId
+        | UpdatePlayer of Player
         | DeleteAllOtherPlayers of Player
         | KillMeNow
         | ReRegister
@@ -145,6 +157,7 @@ module MessageTypes =
         | IncrementScore of int //Internal (Server)
         | SendMeNumbers //Internal (Server)
         | Poke //Internal (Server)
+        | SendAllPlayers
 
         //| ReceivedFromServer of Msg
         //| MessageChanged of string
@@ -156,6 +169,7 @@ module MessageTypes =
         | ScoreLogs of ScoreLog list
         | Fail of FailMessage
         | NewRandom of int
+        | Players of Player list
 
     and FailMessage =
         | TooManyNumbers //From RandomHandler

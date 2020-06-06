@@ -46,12 +46,12 @@ type Model =
 
 
 
-let private noPlayer = {socketId = SocketID Guid.Empty; playerId = PlayerId None; playerName = PlayerName None; orphaned = false}
-let private blankExtras = {PlayerHighScore = Score 0; SystemHighScores = []}
+let private noPlayer = {socketId = SocketID Guid.Empty; playerId = PlayerId None; playerName = PlayerName None; actorName = ActorName None; orphaned = false}
+let private blankExtras = {PlayerHighScore = Score 0; SystemHighScores = []; Players = []}
 
 let private newGame (model:Model) = {model with ModelState = Running {Numbers = RandomNumbers []; Clicked = ClickedNumbers []; Points = Score 0}} //;
 
-let initialModel = {ModelState = NotStarted; Player = noPlayer; GameSystemData = blankExtras; ViewState = SimpleView; ConnectionState = DisconnectedFromServer; CommunicationMode = BroadcastMode.ViaWebSocket}
+let initialModel = {ModelState = NotStarted; Player = noPlayer; GameSystemData = blankExtras; ViewState = SimpleView; ConnectionState = DisconnectedFromServer; CommunicationMode = BroadcastMode.ViaHTTP}
 
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> = initialModel, Cmd.none
@@ -106,9 +106,13 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                 | NotStarted, UpdatePlayerName s ->
                     withoutCommands <| {game with Player = {game.Player with playerName = setPlayerName(s)}}
 
-                | NotStarted, NewPlayer _ ->
+                | NotStarted, NewPlayer ->
                     Console.WriteLine "Sending NewPlayer command..."
                     forwardToServer game msg
+
+                | NotStarted, AdoptPlayer id ->
+                    let updatedGame = {game with Player = {game.Player with playerId = id; orphaned = false}}
+                    forwardToServer updatedGame msg
 
                 //State can be either NotStarted or FinishedGame
                 | _, StartGame ->
@@ -137,12 +141,14 @@ let update (msg : Msg) (game : Model) : Model * Cmd<Msg> =
                     | ClickedNumbers _ -> withoutCommands <| {game with ModelState = Running {state with Clicked = ints}}
 
                 | Running state, ScoreUpdate p ->
-                    Console.WriteLine (sprintf "Score received - %i" (getScoreValue p))
+                    Console.WriteLine (sprintf "Current Score: %i" (getScoreValue p))
                     withoutCommands <| {game with ModelState = Running {state with Points = p}}
 
                 | _, HighScore h -> withoutCommands <| {game with GameSystemData = {game.GameSystemData with PlayerHighScore = h}}
 
                 | _, ScoreLogs l -> withoutCommands <| {game with GameSystemData = {game.GameSystemData with SystemHighScores = l}}
+
+                | _, Players ps -> withoutCommands <| {game with GameSystemData = {game.GameSystemData with Players = ps}}
 
                 | Running state, Fail f ->
                     let finishedGame = {game with ModelState = FinishedGame {FinalScore= state.Points; FailReason = f; Culprit = None}}

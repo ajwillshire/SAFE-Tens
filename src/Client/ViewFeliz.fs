@@ -210,7 +210,7 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
 ]
 
 
-let makeTableRow (sc:ScoreLog) =
+let makeScoreTableRow (sc:ScoreLog) =
                         Html.tableRow[
                             prop.children[
                                 Html.tableCell[prop.text sc.playerName; prop.style[style.padding 20]]
@@ -218,7 +218,7 @@ let makeTableRow (sc:ScoreLog) =
                                 Html.tableCell[prop.text (getScoreValue sc.highScore); prop.style[style.padding 20]]
                             ]]
 
-let makeTableHeaderRow =
+let makeScoreTableHeaderRow =
     Html.tableRow[
         prop.children[
             Html.tableCell[prop.text "Player"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
@@ -261,9 +261,9 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
             
             Html.table[
                     prop.children[
-                        thead[] [makeTableHeaderRow]
+                        thead[] [makeScoreTableHeaderRow]
                         tbody [] [
-                            yield! game.GameSystemData.SystemHighScores |> List.map makeTableRow
+                            yield! game.GameSystemData.SystemHighScores |> List.map makeScoreTableRow
                         ]
                         tfoot[][]
                     ]
@@ -272,6 +272,28 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
 
         ]
     ]
+
+let makePlayerTableRow (dispatchI : Instruction -> unit) (sc:Player)  =
+    Html.tableRow[
+        prop.children[
+            Html.tableCell[prop.text (string (getPlayerId sc.playerId)); prop.style[style.padding 20]]
+            Html.tableCell[prop.text (getPlayerName sc.playerName); prop.style[style.padding 20]]
+            Html.tableCell[prop.text (string sc.orphaned); prop.style[style.padding 20]]
+            if sc.orphaned then Bulma.button.a [
+                                    prop.style[]
+                                    prop.onClick (fun _ -> dispatchI (AdoptPlayer sc.playerId))
+                                    prop.text "Adopt Player"
+                                ]
+        ]]
+
+let makePlayerTableHeaderRow =
+    Html.tableRow[
+        prop.children[
+            Html.tableCell[prop.text "Player Id"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
+            Html.tableCell[prop.text "Player Name"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
+            Html.tableCell[prop.text "Orphaned"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
+            Html.tableCell[prop.text "Adopt?"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
+        ]]
 
 
 let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
@@ -308,8 +330,25 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                                 ]
                                 Bulma.button.a [
                                     prop.style[]
-                                    prop.onClick (fun _ -> dispatchI (NewPlayer state.Player))
+                                    prop.onClick (fun _ -> dispatchI NewPlayer)
                                     prop.text "Create player"
+                                ]
+
+                                Bulma.button.a [
+                                    prop.style[]
+                                    prop.onClick (fun _ -> dispatchI (SendAllPlayers))
+                                    prop.text "See other players"
+                                ]
+                                
+
+                                Html.table[
+                                        prop.children[
+                                            thead[] [makePlayerTableHeaderRow]
+                                            tbody [] [
+                                                yield! state.GameSystemData.Players |> List.map (makePlayerTableRow dispatchI)
+                                            ]
+                                            tfoot[][]
+                                        ]
                                 ]
 
                 //If PlayerId is set, the player can start the game
@@ -342,6 +381,13 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                     ]
         ]
     ]
+
+
+
+
+
+
+
 
 //Re-route to the three page layouts based on the Model state
 let render (game: Model) (dispatch: Msg -> unit) =
