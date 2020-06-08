@@ -54,13 +54,14 @@ module MessageTypes =
              sender: Player}
 
     and SysMsg =
+        | PlayerUpdate of Player
         | SetChannelSocketId of SocketId
         | ConnectionChange of ConnectionState
-        | SetPlayerId of PlayerId
+        //| SetPlayerId of PlayerId
         | ChangeView of ViewState
         | KeyPress of string
         | CloseEvent of SocketId
-        | PlayerUpdate of Player
+
 
     and  ConnectionState =
         | DisconnectedFromServer

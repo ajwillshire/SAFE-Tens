@@ -270,8 +270,11 @@ let mailMan (player:Player) (mailbox: Actor<Msg>) =
         let consoleWriter = getSystemActor mailbox ConsoleWriter
 
         match message with
-            | Instruction (UpdatePlayer p) ->   consoleWriter <<!( sprintf "Player Updated", ConsoleColor.DarkRed)
-                                                Channel.sendMessageToPlayerClient player (SysMsg (PlayerUpdate p))
+            | Instruction (UpdatePlayer p) ->   match getPlayerId p.PlayerId with
+                                                | Some i -> consoleWriter <<!((sprintf "Player Updated - id %i" i), ConsoleColor.DarkRed)
+                                                | None -> consoleWriter <<!((sprintf "Player Updated - No id"), ConsoleColor.Red)
+
+                                                Channel.sendMessageToPlayerClient p (SysMsg (PlayerUpdate p))
                                                 return! loop(p)
 
             | _ -> match message with

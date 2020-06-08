@@ -89,7 +89,8 @@ let gamesMaster (mailbox: Actor<Msg>) =
                                                 consoleWriter <<! ("Trying to spawn NewPlayer - " + playerName, ConsoleColor.Magenta)
 
                                                 let newPlayerActor = spawn mailbox.Context.System playerName (playerActor updatedPlyr) 
-                                                newPlayerActor <! SysMsg (SetPlayerId newPlayerId)
+                                                //newPlayerActor <! SysMsg (SetPlayerId newPlayerId)
+                                                newPlayerActor <!! UpdatePlayer updatedPlyr
                                                 newPlayerActor <!& ScoreLogs (getHighScores highScores)
 
                                                 consoleWriter <<! ("New player registered - " + playerName + " - " + string newPlayerId + " (Number of active players: " + string players.numPlayers + ")", ConsoleColor.Magenta)
