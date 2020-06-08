@@ -4,16 +4,12 @@ open Fable.React
 open Fable.FontAwesome
 open Feliz
 open Feliz.Bulma
-open Feliz.Bulma.Operators
 open Feliz.Bulma.Checkradio
-
-
 
 //Solution References
 open Shared
 open Model
-open CommTypes
-open TensTypes
+open DataTypes
 open MessageTypes
 
 //Highlighting the tech...
@@ -62,7 +58,7 @@ let private makeButton (txt:string) (onClick) :ReactElement =
 let renderButton dispatchI index (number : int)   =
     Bulma.button.a [
         prop.style [  style.fontSize 20 ]
-        prop.onClick (fun _ -> dispatchI (NewClickedNumber {number = number; listIndex = index}))
+        prop.onClick (fun _ -> dispatchI (NewClickedNumber {Number = number; ListIndex = index}))
         prop.text number
     ]
 
@@ -86,9 +82,9 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
 
     let clickedButtons = ForEachNumber(model.Clicked) (clickedButtons)
 
-    let scoreBar = "SAFE Tens - Score:" + string model.Points
+    let scoreBar = "SAFE Tens - Score:" + (string (getScoreValue model.Points))
 
-    let playerDetails = match getPlayerName player.playerName with
+    let playerDetails = match getPlayerName player.PlayerName with
                             | "" -> "Unknown Player!"
                             | n -> "Player Name: " + n
 
@@ -190,9 +186,7 @@ let renderRunning(model : Running) (game:Model) (dispatchI : Instruction -> unit
                             prop.children[ yield! buttons ]
                             prop.style [ style.minHeight 50]
                         ]
-                                                 
                         Html.div [prop.style [style.padding 10]]
-
                         Html.div [
                             prop.children [ yield! clickedButtons ]
                             prop.style [ style.minHeight 50]
@@ -231,14 +225,13 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
     Html.div [
         prop.style[style.margin 50]
         prop.children[
-
             Html.h2 [prop.style [ style.padding 40 ]]
             Html.h2 (sprintf "Final Score: %i" (getScoreValue gameOver.FinalScore))
             Html.h2 (sprintf "Reason for failure: %s" (match gameOver.FailReason with
                                                                             | FailMessage.OverTen -> "Those numbers exceeded 10"
                                                                             | FailMessage.TooManyNumbers -> "There were just too many numbers!"
-                                                                            | FailMessage.HardStop -> match gameOver.Culprit with
-                                                                                                        | Some p -> sprintf "%s pulled the plug on your game!" (getPlayerName p.playerName)
+                                                                            | FailMessage.Killed -> match gameOver.Culprit with
+                                                                                                        | Some p -> sprintf "%s pulled the plug on your game!" (getPlayerName p.PlayerName)
                                                                                                         | None -> "An unknown person pulled the plug on your game"
                                                                             | Ended -> "You quit!"
                                                                             ))
@@ -246,7 +239,7 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
 
             match gameOver.FailReason with
                         //HardStop means that your Actors were deleted - no prospect of Restarting
-                        | FailMessage.HardStop _ -> makeButton "Re-Register" (fun _ -> dispatchI ReRegister) 
+                        | FailMessage.Killed _ -> makeButton "Re-Register" (fun _ -> dispatchI ReRegister) 
                         | _ ->
                                 Bulma.columns [
                                     column.is2
@@ -268,32 +261,40 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
                         tfoot[][]
                     ]
             ]
-
-
         ]
     ]
 
-let makePlayerTableRow (dispatchI : Instruction -> unit) (sc:Player)  =
-    Html.tableRow[
-        prop.children[
-            Html.tableCell[prop.text (string (getPlayerId sc.playerId)); prop.style[style.padding 20]]
-            Html.tableCell[prop.text (getPlayerName sc.playerName); prop.style[style.padding 20]]
-            Html.tableCell[prop.text (string sc.orphaned); prop.style[style.padding 20]]
-            if sc.orphaned then Bulma.button.a [
-                                    prop.style[]
-                                    prop.onClick (fun _ -> dispatchI (AdoptPlayer sc.playerId))
-                                    prop.text "Adopt Player"
-                                ]
-        ]]
 
 let makePlayerTableHeaderRow =
     Html.tableRow[
         prop.children[
             Html.tableCell[prop.text "Player Id"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
             Html.tableCell[prop.text "Player Name"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
+            Html.tableCell[prop.text "Actor Name"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
+            Html.tableCell[prop.text "High Score"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
             Html.tableCell[prop.text "Orphaned"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
             Html.tableCell[prop.text "Adopt?"; prop.style[style.padding 20; style.borderBottom (5, borderStyle.double, color.black)]]
-        ]]
+        ]
+    ]
+
+let makePlayerTableRow (dispatchI : Instruction -> unit) (sc:Player)  =
+    Html.tableRow[
+        prop.children[
+            Html.tableCell[prop.text(string (getPlayerId sc.PlayerId)); prop.style[style.padding 20]]
+            Html.tableCell[prop.text(getPlayerName sc.PlayerName); prop.style[style.padding 20]]
+            Html.tableCell[prop.text(getActorName sc.ActorName); prop.style[style.padding 20]]
+            Html.tableCell[prop.text(getScoreValue sc.HighScore); prop.style[style.padding 20]]
+            Html.tableCell[prop.text(string sc.Orphaned); prop.style[style.padding 20]]
+            if sc.Orphaned then
+                            Bulma.button.a [
+                                    prop.style[]
+                                    prop.onClick (fun _ -> dispatchI (AdoptPlayer sc.PlayerId))
+                                    prop.text "Adopt Player"
+                            ]
+                           else
+                            Html.tableCell[prop.text("Active"); prop.style[style.padding 20]]
+        ]
+    ]
 
 
 let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
@@ -309,7 +310,7 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
 
             Html.h2 [prop.style [ style.padding 20 ]]
 
-            match getPlayerId state.Player.playerId with
+            match getPlayerId state.Player.PlayerId with
                 //If PlayerId is not set, the player needs to register before proceeding
                 | None ->   Html.h2 [
                                 prop.style [ style.padding 40; style.paddingLeft 0 ]
@@ -318,11 +319,11 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
 
                             Bulma.input.text [
                                 prop.style[style.padding 30]
-                                prop.valueOrDefault (getPlayerName state.Player.playerName)
+                                prop.valueOrDefault (getPlayerName state.Player.PlayerName)
                                 prop.onChange(UpdatePlayerName >> dispatchI)
                             ]
 
-                            match getPlayerName state.Player.playerName with
+                            match getPlayerName state.Player.PlayerName with
                             | "" -> ()
                             | _ ->
                                 Html.h2 [
@@ -339,13 +340,14 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                                     prop.onClick (fun _ -> dispatchI (SendAllPlayers))
                                     prop.text "See other players"
                                 ]
-                                
-
+                                Html.h2 [
+                                    prop.style [ style.padding 40; style.paddingLeft 0 ]
+                                ]
                                 Html.table[
                                         prop.children[
                                             thead[] [makePlayerTableHeaderRow]
                                             tbody [] [
-                                                yield! state.GameSystemData.Players |> List.map (makePlayerTableRow dispatchI)
+                                                yield! state.GameSystemData.Players.Players |> List.map (makePlayerTableRow dispatchI)
                                             ]
                                             tfoot[][]
                                         ]
@@ -355,13 +357,12 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                 | _ ->
 
                     Html.h2 [
-                        prop.text (sprintf "Hello %s!" (getPlayerName state.Player.playerName))
+                        prop.text (sprintf "Hello %s!" (getPlayerName state.Player.PlayerName))
                         prop.style [style.padding 40; style.paddingLeft 0]]
 
                     Bulma.columns [
                         column.is2
                         prop.children [
-
                             Bulma.button.a [
                                 color.isPrimary
                                 button.isLarge
@@ -369,7 +370,6 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                                 prop.onClick (fun _ -> dispatchI (StartGame))
                                 prop.text "Start"
                             ]
-
                             Bulma.button.a [
                                 color.isPrimary
                                 button.isLarge
@@ -382,13 +382,6 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
         ]
     ]
 
-
-
-
-
-
-
-
 //Re-route to the three page layouts based on the Model state
 let render (game: Model) (dispatch: Msg -> unit) =
 
@@ -397,8 +390,6 @@ let render (game: Model) (dispatch: Msg -> unit) =
 
   match game.ModelState with 
   | NotStarted -> renderNotStarted game dispatchI
-
   | Running state -> renderRunning state game dispatchI dispatchS
-
   | FinishedGame gameOver -> renderFinished game gameOver dispatchI
 
