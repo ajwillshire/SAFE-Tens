@@ -166,12 +166,10 @@ let gamesMaster (mailbox: Actor<Msg>) =
     }
     loop ({Players=[]},[])
 
-
 let getSystemActorSpec (actor:SystemActor) =
     match actor with
         | GamesMaster -> gamesMaster
         | ConsoleWriter -> consoleWriter
-
 
 let spawnActors = 
 

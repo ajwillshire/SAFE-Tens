@@ -19,15 +19,6 @@ open GameActors
 open SystemActors
 open Saturn.Channels
 
-
-let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" -> None | x -> Some x
-
-let publicPath = Path.GetFullPath "../Client/public"
-
-let port =
-    "SERVER_PORT"
-    |> tryGetEnv |> Option.map uint16 |> Option.defaultValue 8085us
-
 //Initialise the actor system
 let actorSystem = spawnActors
 
@@ -51,7 +42,6 @@ let forwardMessageToActor next (ctx:HttpContext)= task {
                     | _ -> Simple ("Non PlayerMessage Received") |> WriteToConsole
 
     return! json reply next ctx }
-
 
 let tensRouter = router {post "/api/messages" forwardMessageToActor}
 
@@ -100,11 +90,13 @@ let mainChannel = channel {
      }
 
  //******************************
+let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" -> None | x -> Some x
+let publicPath = Path.GetFullPath "../Client/public"
+let port = "SERVER_PORT" |> tryGetEnv |> Option.map uint16 |> Option.defaultValue 8085us
 
 let app = application {
     url ("http://0.0.0.0:" + port.ToString() + "/")
     use_router tensRouter
-    //no_router
     add_channel "/channel" mainChannel
     memory_cache
     use_static publicPath
