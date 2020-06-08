@@ -82,10 +82,10 @@ let mainChannel = channel {
                     //All requests go to the gamesMaster
                     getSystemActor2 actorSystem GamesMaster <! message
 
-                    match message with
-                    | PlayerMessage pm -> Console.WriteLine (sprintf "Message Socket Id:%s" (string (getSocketId pm.sender.SocketId)))
-                                          Console.WriteLine (sprintf "Socket Id:%s" (string clientInfo.SocketId))
-                    | _ -> ()
+                    //match message with
+                    //| PlayerMessage pm -> Console.WriteLine (sprintf "Message Socket Id:%s" (string (getSocketId pm.sender.SocketId)))
+                    //                      Console.WriteLine (sprintf "Socket Id:%s" (string clientInfo.SocketId))
+                    //| _ -> ()
 
                 })
 

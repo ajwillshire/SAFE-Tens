@@ -148,12 +148,13 @@ let handleSystemMessages (msg:SysMsg) (game:Model) =
 
             | _, SetChannelSocketId g ->
                 let updatedPlayer = {game.Player with SocketId = g} //Will get the playerId from the Server in due course
+                let updatedGame = {game with Player = updatedPlayer}
                 let cmd1 = Cmd.ofMsg (("Channel Socket Id is " + string g) |> (Simple >> WriteToConsole))
                 let cmds = match game.Player.ActorName with
                             | ActorName None -> cmd1
-                            | _ -> Cmd.batch [cmd1; sendMessageToServer game (Instruction (UpdatePlayer updatedPlayer))]
+                            | _ -> Cmd.batch [cmd1; sendMessageToServer updatedGame (Instruction (UpdatePlayer updatedPlayer))]
 
-                game, cmds
+                updatedGame, cmds
 
             | _, ConnectionChange status ->
                     { game with ConnectionState = status }, Cmd.none
