@@ -78,8 +78,9 @@ let private withoutCommands model = model, Cmd.none
 
 
 //Process Instruction messages
-let handleInstructions(msg:Instruction) (game:Model) : Model * Cmd<Msg> =
+let handleInstructions(msg : Instruction) (game : Model) : Model * Cmd<Msg> =
     match game.ModelState, msg with
+    
                     | NotStarted, UpdatePlayerName s ->
                         withoutCommands <| {game with Player = {game.Player with PlayerName = setPlayerName(s)}}
     
@@ -88,6 +89,7 @@ let handleInstructions(msg:Instruction) (game:Model) : Model * Cmd<Msg> =
                         forwardMessageToServer game (Msg.Instruction msg)
     
                     | NotStarted, AdoptPlayer _ ->
+                        //let updatedGame = {game with Player = {game.Player with PlayerId = id; Orphaned = false}}
                         forwardMessageToServer game (Msg.Instruction msg)
     
                     //State can be either NotStarted or FinishedGame
@@ -99,18 +101,19 @@ let handleInstructions(msg:Instruction) (game:Model) : Model * Cmd<Msg> =
                     | _, KillMeNow ->   let cmd1 = sendMessageToServer game (Msg.Instruction msg)
                                         let cmd2 = Cmd.ofMsg(Instruction ReRegister)
                                         game, Cmd.batch[cmd1;cmd2]
-
-                    //Returns the player to a blank slate except for the existing SocketId
-                    | _, ReRegister -> {game with ModelState = NotStarted;
-                                                               Player = {noPlayer with SocketId = game.Player.SocketId}}, Cmd.none
     
-                    //All other commands get sent to the Server for processing
+                    | _, ReRegister -> {game with ModelState = NotStarted;
+                                                               Player = {game.Player with PlayerId = PlayerId None;
+                                                                                          PlayerName = PlayerName None}}, Cmd.none
+    
+                    //All other commands get sent to the Server
                     | _, _ -> forwardMessageToServer game (Msg.Instruction msg)
 
 //Process GameData messages
 let handleData(msg : GameData) (game : Model) : Model * Cmd<Msg> =
 
     match game.ModelState, msg with
+
                 | Running state, GameNums ints ->
                     match ints with
                     | RandomNumbers _ -> withoutCommands <| {game with ModelState = Running {state with Numbers = ints}}
@@ -134,17 +137,16 @@ let handleData(msg : GameData) (game : Model) : Model * Cmd<Msg> =
                     | Killed -> finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by someone.") |> (Simple >> WriteToConsole))
                     | Ended -> finishedGame, Cmd.ofMsg((sprintf "You quit!") |> (Simple >> WriteToConsole))
 
+
+
                 | _ -> withoutCommands <| game
 
 //Process SysMsg messages 
 let handleSystemMessages (msg:SysMsg) (game:Model) =
-    Console.WriteLine "System Message received"
+
     match game.ModelState, msg with
-            | _, PlayerUpdate p ->  Console.WriteLine "Player Update received"
-                                    withoutCommands <| {game with Player = p}
-                                        //match state with
-                                        //| NotStarted -> withoutCommands <| {game with Player = p}
-                                        //| _ -> withoutCommands <| {game with Player = p}
+
+            | _, PlayerUpdate p -> withoutCommands <| {game with Player = p}
 
             | _, SetChannelSocketId g ->
                 let updatedPlayer = {game.Player with SocketId = g} //Will get the playerId from the Server in due course
@@ -153,10 +155,14 @@ let handleSystemMessages (msg:SysMsg) (game:Model) =
                             | ActorName None -> cmd1
                             | _ -> Cmd.batch [cmd1; sendMessageToServer game (Instruction (UpdatePlayer updatedPlayer))]
 
-                game, cmds
+                {game with Player = updatedPlayer}, cmds
 
             | _, ConnectionChange status ->
                     { game with ConnectionState = status }, Cmd.none
+
+            | _, SetPlayerId i ->
+                let newGame = {game with Player = {game.Player with PlayerId = i}}
+                withoutCommands newGame
 
             | _, ChangeView v ->
                 withoutCommands <| {game with ViewState = v}

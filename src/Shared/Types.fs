@@ -1,6 +1,5 @@
 namespace Shared
 open System
-open System.Text.RegularExpressions
 
 module DataTypes =
 
@@ -20,14 +19,10 @@ module DataTypes =
                                         | None -> String.Empty
 
     type ActorName = ActorName of string option
-    //let setActorName (name:PlayerName) (id:PlayerId) = ActorName (Some ((getPlayerName name).Replace(" ", "_") + "_" + string (match getPlayerId id with | Some n -> n | None -> -1)))
-    let setActorName (name:PlayerName) (id:PlayerId) =  let newName = Regex.Replace((getPlayerName name), @"[^\w\-*+=~_.,;:!@&’()]", "")
-                                                        ActorName (Some (newName + "_" + string (match getPlayerId id with | Some n -> n | None -> -1)))
+    let setActorName (name:PlayerName) (id:PlayerId) = ActorName (Some ((getPlayerName name).Replace(" ", "_") + "_" + string (match getPlayerId id with | Some n -> n | None -> -1)))
     let getActorName (ActorName n) = match n with
                                         | Some s -> s
                                         | None -> String.Empty
-
-                                        //Regex.Replace(strIn, @"[^\w\-*+=~_.,;:!@&’()]", "", RegexOptions.None, TimeSpan.FromSeconds(1.5))
 
     type SocketId = SocketId of Guid option
     let setSocketId s = SocketId (Some s)

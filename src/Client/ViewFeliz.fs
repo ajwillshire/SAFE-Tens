@@ -238,7 +238,7 @@ let private renderFinished (game:Model) gameOver (dispatchI : Instruction -> uni
             Html.h2 [prop.style [ style.padding 40 ]]
 
             match gameOver.FailReason with
-                        //Killed means that your Actors were deleted - no prospect of Restarting with them
+                        //HardStop means that your Actors were deleted - no prospect of Restarting
                         | FailMessage.Killed _ -> makeButton "Re-Register" (fun _ -> dispatchI ReRegister) 
                         | _ ->
                                 Bulma.columns [
@@ -323,8 +323,8 @@ let private renderNotStarted (state: Model) (dispatchI : Instruction -> unit) =
                                 prop.onChange(UpdatePlayerName >> dispatchI)
                             ]
 
-                            match state.Player.PlayerName with
-                            | PlayerName None -> ()
+                            match getPlayerName state.Player.PlayerName with
+                            | "" -> ()
                             | _ ->
                                 Html.h2 [
                                     prop.style [ style.padding 40; style.paddingLeft 0 ]
