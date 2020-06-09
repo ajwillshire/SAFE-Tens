@@ -68,13 +68,11 @@ let forwardMessageToServer (game:Model) (msg:Msg) = game, sendMessageToServer ga
 // these commands in turn, can dispatch messages to which the update function will react.
 
 let private noPlayer = {SocketId = SocketId None; PlayerId = PlayerId None; PlayerName = PlayerName None; ActorName = ActorName None; Orphaned = false; HighScore = Score 0}
-let private blankExtras = {PlayerHighScore = Score 0; SystemHighScores = []; Players = None}
+let private blankSystemData = {PlayerHighScore = Score 0; SystemHighScores = []; Players = None}
 let private newGame (model:Model) = {model with ModelState = Running {Numbers = RandomNumbers []; Clicked = ClickedNumbers []; Points = Score 0}}
-let private initialModel = {ModelState = NotStarted; Player = noPlayer; GameSystemData = blankExtras; ViewState = SimpleView; ConnectionState = DisconnectedFromServer; CommunicationMode = BroadcastMode.ViaWebSocket}
+let private initialModel = {ModelState = NotStarted; Player = noPlayer; GameSystemData = blankSystemData; ViewState = SimpleView; ConnectionState = DisconnectedFromServer; CommunicationMode = BroadcastMode.ViaWebSocket}
 
 let private withoutCommands model = model, Cmd.none
-
-
 
 
 //Process Instruction messages
@@ -101,8 +99,9 @@ let handleInstructions(msg:Instruction) (game:Model) : Model * Cmd<Msg> =
                                         game, Cmd.batch[cmd1;cmd2]
 
                     //Returns the player to a blank slate except for the existing SocketId
-                    | _, ReRegister -> {game with ModelState = NotStarted;
-                                                               Player = {noPlayer with SocketId = game.Player.SocketId}}, Cmd.none
+                    | _, ReRegister -> {game with ModelState = NotStarted
+                                                               Player = {noPlayer with SocketId = game.Player.SocketId}
+                                                               GameSystemData = blankSystemData}, Cmd.none
     
                     //All other commands get sent to the Server for processing
                     | _, _ -> forwardMessageToServer game (Msg.Instruction msg)
@@ -133,6 +132,12 @@ let handleData(msg : GameData) (game : Model) : Model * Cmd<Msg> =
                     | OverTen -> finishedGame, Cmd.ofMsg("The sum of total clicked numbers exceeded ten." |> (Simple >> WriteToConsole))
                     | Killed -> finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by someone.") |> (Simple >> WriteToConsole))
                     | Ended -> finishedGame, Cmd.ofMsg((sprintf "You quit!") |> (Simple >> WriteToConsole))
+
+                | _, Fail f -> let finishedGame = {game with ModelState = FinishedGame {FinalScore= Score 0; FailReason = f; Culprit = None}}
+                               match f with
+                               | Killed -> finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by someone.") |> (Simple >> WriteToConsole))
+                               | _ -> withoutCommands <| game
+
 
                 | _ -> withoutCommands <| game
 
@@ -184,16 +189,14 @@ let handleSystemMessages (msg:SysMsg) (game:Model) =
 //Process PlayerMessages
 let handlePlayerMessage (msg:PlayerMessage) (game:Model) =
 
-        match game.ModelState, msg with
-        | Running state, pm ->  Console.WriteLine (sprintf "PlayerMessage received from %s!" (getPlayerName pm.sender.PlayerName))
-                                match pm.msg with
-                                | GameData g -> match g with
-                                                | Fail (Killed) -> let finishedGame = {game with ModelState = FinishedGame {FinalScore= state.Points; FailReason = Killed; Culprit = Some pm.sender}}
-                                                                   finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by %s" (getPlayerName pm.sender.PlayerName)) |> (Simple >> WriteToConsole))
+        match msg.msg with
+        | GameData g -> match g with
+                        | Fail Killed -> let finishedGame = match game.ModelState with
+                                                            | Running state -> {game with ModelState = FinishedGame {FinalScore= state.Points; FailReason = Killed; Culprit = Some msg.sender}}
+                                                            | _ -> {game with ModelState = FinishedGame {FinalScore= Score 0; FailReason = Killed; Culprit = Some msg.sender}}
+                                         finishedGame, Cmd.ofMsg((sprintf "This game was brought to a premature end by %s" (getPlayerName msg.sender.PlayerName)) |> (Simple >> WriteToConsole))
 
-                                                | _ -> withoutCommands <| game
-
-                                | _ -> withoutCommands <| game
+                        | _ -> withoutCommands <| game
 
         | _ -> withoutCommands <| game
 
@@ -201,7 +204,7 @@ let handlePlayerMessage (msg:PlayerMessage) (game:Model) =
 let printConsoleMessage (msg:ConsoleMessage) (game : Model) =
     match msg with
     | Simple s -> Console.WriteLine s
-    | Complex c -> Console.WriteLine c.Text //Colours aren't supported (?)
+    | Complex c -> Console.WriteLine c.Text //TODO - Are colours are supported in the browser console? 
     | Error e -> Console.WriteLine e.Message
     withoutCommands game
 
