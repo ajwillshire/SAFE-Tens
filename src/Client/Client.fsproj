@@ -12,7 +12,11 @@
         <Compile Include="..\Shared\Messages.fs" Link="Messages.fs" />
         <Compile Include="Version.fs" />
         <Compile Include="Model.fs" />
-        <Compile Include="ViewFeliz.fs" />
+        <Compile Include="Views\ViewComponents.fs" />
+        <Compile Include="Views\ViewNotStarted.fs" />
+        <Compile Include="Views\ViewRunning.fs" />
+        <Compile Include="Views\ViewFinished.fs" />
+        <Compile Include="Views\ViewRouter.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
     <ItemGroup>

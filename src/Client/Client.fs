@@ -6,6 +6,7 @@ open Elmish.React
 open Thoth.Json
 open Shared
 open MessageTypes
+open Views
 
 
 module Channel =
@@ -85,7 +86,7 @@ open Elmish.HMR
 #endif
 
 
-Program.mkProgram Model.init Model.update ViewFeliz.render
+Program.mkProgram Model.init Model.update ViewRouter.render
 |> Program.withSubscription subs 
 #if DEBUG
 |> Program.withConsoleTrace

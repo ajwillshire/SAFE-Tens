@@ -68,7 +68,7 @@ let forwardMessageToServer (game:Model) (msg:Msg) = game, sendMessageToServer ga
 // these commands in turn, can dispatch messages to which the update function will react.
 
 let private noPlayer = {SocketId = SocketId None; PlayerId = PlayerId None; PlayerName = PlayerName None; ActorName = ActorName None; Orphaned = false; HighScore = Score 0}
-let private blankExtras = {PlayerHighScore = Score 0; SystemHighScores = []; Players = {Players=[]}}
+let private blankExtras = {PlayerHighScore = Score 0; SystemHighScores = []; Players = None}
 let private newGame (model:Model) = {model with ModelState = Running {Numbers = RandomNumbers []; Clicked = ClickedNumbers []; Points = Score 0}}
 let private initialModel = {ModelState = NotStarted; Player = noPlayer; GameSystemData = blankExtras; ViewState = SimpleView; ConnectionState = DisconnectedFromServer; CommunicationMode = BroadcastMode.ViaWebSocket}
 
@@ -124,7 +124,7 @@ let handleData(msg : GameData) (game : Model) : Model * Cmd<Msg> =
 
                 | _, ScoreLogs l -> withoutCommands <| {game with GameSystemData = {game.GameSystemData with SystemHighScores = l}}
 
-                | _, Players ps -> withoutCommands <| {game with GameSystemData = {game.GameSystemData with Players = ps}}
+                | _, Players ps -> withoutCommands <| {game with GameSystemData = {game.GameSystemData with Players = Some ps}}
 
                 | Running state, Fail f ->
                     let finishedGame = {game with ModelState = FinishedGame {FinalScore= state.Points; FailReason = f; Culprit = None}}

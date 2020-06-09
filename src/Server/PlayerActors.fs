@@ -240,12 +240,11 @@ let currentGame (mailbox: Actor<Msg>) =
                             match g with
                             | Fail f -> if debug then mailMan <<! (("Fail message received!! - " + string f), ConsoleColor.Red)
                                         mailMan <!& HighScore currentScore
-                                        mailMan <!& Fail f
                                         mailMan <!! StopRandom
                                         mailMan <!! StopAuto
-                                        if f = Killed then mailMan <!! KillMeNow
-
-                                        return! loop(currentScore)
+                                        match f with
+                                        | Killed -> mailMan <!! KillMeNow //Will have come from client side
+                                        | _ -> mailMan <!& Fail f //Will have come from server side
 
                             | _ -> return! loop(currentScore)
 
@@ -299,7 +298,7 @@ let mailMan (player:Player) (mailbox: Actor<Msg>) =
 
                         // If someone sends us data then we need to send it client-side as a Msg.
                         | GameData g -> match g with
-                                        | HighScore _ -> myPlayer <!& g
+                                        | HighScore _ -> myPlayer <!& g    //Send this onto the player for logging
                                         | _ -> Channel.sendMessageToPlayerClient player (GameData g)
                                                consoleWriter <<! (sprintf "%s GameData received by MailMan" (string g), ConsoleColor.DarkRed)
 
@@ -333,6 +332,8 @@ let getPlayerActorSpec (actor:PlayerActor) (player:Player) =
         | CurrentGame -> currentGame
         | AutoPlayer -> automaticPlayer
 
+
+//Top-level Actor
 let playerActor (player:Player) (mailbox : Actor<Msg>) =
 
     let gamesMaster = getSystemActor mailbox GamesMaster
@@ -353,18 +354,21 @@ let playerActor (player:Player) (mailbox : Actor<Msg>) =
         //Also allows the player to be updated from the Client-side
 
         match message with
-        | GameData (HighScore h) -> gamesMaster <!% {sender = player; msg = message} //Let's keep track of all scores, high or not!
-                                    if (getScoreValue h) > (getScoreValue player.HighScore) then
+        | GameData (HighScore h) -> if (getScoreValue h) > (getScoreValue player.HighScore) then
                                         let updatedPlayer = {player with HighScore = h}
                                         mailMan <!! UpdatePlayer updatedPlayer
                                         mailMan <<! (sprintf "New high score of %i" (getScoreValue h),ConsoleColor.DarkGreen)
-                                        
+                                        gamesMaster <!% {sender = updatedPlayer; msg = message} //Send the player with the updated high score
                                         return! loop(updatedPlayer)
-                                    else return! loop(player)
+
+                                    else gamesMaster <!% {sender = player; msg = message} //Let's keep track of all scores, high or not!
+                                         return! loop(player)
 
         | Instruction (UpdatePlayer p) -> mailMan <! message
                                           mailMan <<! ("PA Updating Player", ConsoleColor.DarkBlue)
                                           return! loop(p)
+
+        | Instruction (KillMeNow) -> gamesMaster <!% {sender = player; msg = message}
 
         //Anything else is forwarded on to the MailMan to deal with
         | _ -> mailMan <! message

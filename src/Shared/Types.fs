@@ -72,7 +72,7 @@ module DataTypes =
         {
          PlayerHighScore : Score
          SystemHighScores : ScoreLog list
-         Players : PlayerList
+         Players : PlayerList option
         }
 
     type GameConfig =

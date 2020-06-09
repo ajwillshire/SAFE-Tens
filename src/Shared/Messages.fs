@@ -16,6 +16,7 @@ module MessageTypes =
         | UpdatePlayerName of string
         | AdoptPlayer of PlayerId
         | UpdatePlayer of Player
+        | DeletePlayer of PlayerId
         | DeleteAllOtherPlayers of Player
         | KillMeNow
         | ReRegister

@@ -105,6 +105,14 @@ let gamesMaster (mailbox: Actor<Msg>) =
                                                                  return! loop((players.updatePlayer adoptedPlayer), highScores)
                                                     | None -> return! loop(players, highScores)
 
+                | Instruction (DeletePlayer pId) -> let delP = (players.getPlayerById pId)
+                                                    match delP with
+                                                    | Some dp -> getActor mailbox dp <!% {sender = mSender; msg = GameData (Fail Killed)}
+                                                                 consoleWriter <<! ((sprintf "Player %s has been notified of termination by %s" (getPlayerName dp.PlayerName) (getPlayerName mSender.PlayerName)), ConsoleColor.Red)
+                                                    | None -> consoleWriter <<! ("Player not found", ConsoleColor.Red)
+                                                    return! loop (players, highScores)
+
+
                 //This is to remove all of the other players from the Actor system, ultimately via means of a Poison Pill                                
                 | Instruction (DeleteAllOtherPlayers p) ->  players.Players
                                                                 |> List.filter (fun x -> x.PlayerId <> p.PlayerId)
@@ -129,7 +137,8 @@ let gamesMaster (mailbox: Actor<Msg>) =
                                             consoleWriter <<!(m.sender.refName + " has been killed.", ConsoleColor.Red)
                                             return! loop (players.removePlayerById m.sender.PlayerId, highScores)
 
-                | GameData (HighScore h) -> let newHighScores = getHighScores ([{playerName = getPlayerName mSender.PlayerName; actorName = mSender.refName; highScore = h}] @ highScores)
+                | GameData (HighScore h) -> consoleWriter <<! (sprintf "New score received from %s: %i" (getPlayerName mSender.PlayerName) (getScoreValue h), ConsoleColor.Red)
+                                            let newHighScores = getHighScores ([{playerName = getPlayerName mSender.PlayerName; actorName = mSender.refName; highScore = h}] @ highScores)
                                             //Send high scores to all players
                                             players.Players |> List.iter (fun p -> getActor mailbox p <!& ScoreLogs newHighScores)
 
