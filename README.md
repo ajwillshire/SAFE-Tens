@@ -1,6 +1,14 @@
-# SAFE Template
+# SAFE-Tens
+This is a learn-by-doing project involving the [SAFE Stack](https://safe-stack.github.io/) and [Akka.Net](https://getakka.net/). It was originally inspired by [this Elmish project](https://github.com/rommsen/tens) built by [Roman Sachse](https://github.com/rommsen) as documented in [this](https://youtu.be/jeYlmH2NlTw) video.
 
-This template can be used to generate a full-stack web application using the [SAFE Stack](https://safe-stack.github.io/). It was created using the dotnet [SAFE Template](https://safe-stack.github.io/docs/template-overview/). If you want to learn more about the template why not start with the [quick start](https://safe-stack.github.io/docs/quickstart/) guide?
+Virtually all of the game logic has been moved server-side and each player has their own set of Actors created to run their instance of the game. You can have multiple client sessions occurring simultaneously, and high scores across players are tracked. There is an automatic player that can be set to play the game unsupervised. It's not infallible, however!
+
+You can see the other players that are active, you can kill them or, if a player has abandoned their Actors (i.e., closed their session) you can adopt that system.
+
+The interface still needs work - it's functional but not very pretty. But I'm getting there!
+
+Any suggestions for improvements gratefully received.
+
 
 ## Install pre-requisites
 
@@ -17,7 +25,7 @@ You'll need to install the following pre-requisites in order to build SAFE appli
 To concurrently run the server and the client components in watch mode use the following command:
 
 ```bash
-fake build -t Run
+fake build --target run
 ```
 
 
@@ -28,7 +36,7 @@ You will find more documentation about the used F# components at the following p
 * [Saturn](https://saturnframework.org/docs/)
 * [Fable](https://fable.io/docs/)
 * [Elmish](https://elmish.github.io/elmish/)
-* [Fulma](https://fulma.github.io/Fulma/)
+* [Feliz](https://github.com/Zaid-Ajaj/Feliz)
 
 If you want to know more about the full Azure Stack and all of it's components (including Azure) visit the official [SAFE documentation](https://safe-stack.github.io/docs/).
 
