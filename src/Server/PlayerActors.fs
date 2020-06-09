@@ -5,13 +5,12 @@ open Microsoft.FSharp.Core.Operators
 open Akka.FSharp
 open Akka.Actor
 
-open Shared
-open CommTypes
-open TensTypes
-open MessageTypes
-open Operators
+open Shared.DataTypes
+open Shared.MessageTypes
 
+open Operators
 open AutoPlayer
+open GameActors
 
 let debug = true
 let overDebug = false
@@ -27,9 +26,9 @@ type private LocalCancelables =
 
 let scheduler (mailbox: Actor<Msg>) =
 
-    let mailMan = select "../mailMan"  mailbox.Context
-    let genAgent = select "../randomGenerator"  mailbox.Context
-    let autoPlayer = select "../auto"  mailbox.Context
+    let mailMan = getSiblingActor mailbox MailMan
+    let genAgent = getSiblingActor mailbox RandomGenerator
+    let autoPlayer = getSiblingActor mailbox AutoPlayer
 
     mailMan <<! ("Scheduler created", ConsoleColor.Blue)
 
@@ -39,7 +38,6 @@ let scheduler (mailbox: Actor<Msg>) =
 
     let rec loop (myCancelables:LocalCancelables) = actor {
         let! message = mailbox.Receive ()
-
         
         match message with
 
@@ -80,8 +78,8 @@ let scheduler (mailbox: Actor<Msg>) =
 
 let randomNumberGenerator (mailbox: Actor<Msg>) =
 
-    let mailMan = select "../mailMan"  mailbox.Context
-    let randomHandler = select "../randomHandler"  mailbox.Context
+    let mailMan = getSiblingActor mailbox MailMan
+    let randomHandler = getSiblingActor mailbox RandomHandler
 
     mailMan <<! ("Random generator created", ConsoleColor.Blue)
 
@@ -101,8 +99,8 @@ let randomNumberGenerator (mailbox: Actor<Msg>) =
 
 let randomHandler (mailbox: Actor<Msg>) =
 
-    let mailMan = select "../mailMan"  mailbox.Context
-    let validator = select "../validator"  mailbox.Context
+    let mailMan = getSiblingActor mailbox MailMan
+    let validator = getSiblingActor mailbox Validator
 
     mailMan <<! ("RandomHandler created", ConsoleColor.Blue)
 
@@ -126,13 +124,10 @@ let randomHandler (mailbox: Actor<Msg>) =
 
                             | _ -> return! loop(randomNumbers)
 
-
         | GameData (NewRandom i) -> let newNums = addToGameNumbers randomNumbers i
                                     mailMan <!& GameNums newNums
-                                    validator <!& GameNums newNums //Only needs to happen here as the list grows
+                                    validator <!& GameNums newNums
                                     return! loop (newNums)
-
-
 
         | _ -> return! loop (randomNumbers)
 
@@ -142,9 +137,9 @@ let randomHandler (mailbox: Actor<Msg>) =
 
 let clickedHandler (mailbox: Actor<Msg>) = 
 
-        let mailMan = select "../mailMan"  mailbox.Context
-        let randomHandler = select "../randomHandler"  mailbox.Context
-        let validator = select "../validator"  mailbox.Context
+        let mailMan = getSiblingActor mailbox MailMan
+        let randomHandler = getSiblingActor mailbox RandomHandler
+        let validator = getSiblingActor mailbox Validator
 
         mailMan <<! ("ClickedHandler created", ConsoleColor.Blue)
 
@@ -153,8 +148,8 @@ let clickedHandler (mailbox: Actor<Msg>) =
 
             match msg with
             | Instruction i -> match i with 
-                                    | NewClickedNumber n -> let newNums = addToGameNumbers clickedNumbers n.number
-                                                            if debug then mailMan <<! ((sprintf "You picked %i!" n.number), ConsoleColor.DarkMagenta)
+                                    | NewClickedNumber n -> let newNums = addToGameNumbers clickedNumbers n.Number
+                                                            if debug then mailMan <<! ((sprintf "You picked %i!" n.Number), ConsoleColor.DarkMagenta)
                                                             randomHandler <!! RemoveNumber n
                                                             mailMan <!& GameNums newNums
                                                             validator <!& GameNums newNums
@@ -174,16 +169,15 @@ let clickedHandler (mailbox: Actor<Msg>) =
 
 let validator (mailbox: Actor<Msg>) =
 
-    let mailMan = select "../mailMan"  mailbox.Context
+    let mailMan = getSiblingActor mailbox MailMan
+    let clickedHandler = getSiblingActor mailbox ClickedHandler
+    let currentGame = getSiblingActor mailbox CurrentGame
 
     mailMan <<! ("Validator created", ConsoleColor.Blue)
 
     let rec loop() = actor {
 
         let! message = mailbox.Receive()
-
-        let clickedHandler = select "../clickedHandler"  mailbox.Context
-        let currentGame = select "../currentGame" mailbox.Context
 
         match message with
 
@@ -194,7 +188,7 @@ let validator (mailbox: Actor<Msg>) =
                             | ClickedNumbers _ -> match (a,b) with
                                                     | (x, _) when x > 5 -> currentGame <!& Fail TooManyNumbers
                                                     | (_,y) when y > 10 -> currentGame <!& Fail OverTen
-                                                    | (_, 10) -> clickedHandler <! Instruction ClearNumbers
+                                                    | (_, 10) -> clickedHandler <!! ClearNumbers
                                                                  mailMan <<! ("You made 10!", ConsoleColor.Blue)
                                                                  currentGame <!! IncrementScore 1
                                                     | _ -> ()
@@ -202,10 +196,9 @@ let validator (mailbox: Actor<Msg>) =
                             | RandomNumbers _ -> match (a,b) with
                                                     | (y,_) when y >  10 -> currentGame <!& Fail TooManyNumbers
                                                     | _ -> ()
-
                         | _ -> ()
-
         | _ -> ()
+
         return! loop()
     }
     loop()
@@ -213,18 +206,15 @@ let validator (mailbox: Actor<Msg>) =
 
 let currentGame (mailbox: Actor<Msg>) =
 
-    let mailMan = select "../mailMan"  mailbox.Context
-    let scheduler = select "../scheduler"  mailbox.Context
-    let randomHandler = select "../randomHandler"  mailbox.Context 
-    let clickedHandler = select "../clickedHandler"  mailbox.Context
-    let myPlayer = select "../" mailbox.Context
+    let mailMan = getSiblingActor mailbox MailMan
+    let randomHandler = getSiblingActor mailbox RandomHandler 
+    let clickedHandler = getSiblingActor mailbox ClickedHandler
 
     let rec loop(currentScore:Score) = actor {
 
         let! message = mailbox.Receive()
 
         match message with
-
             | Instruction i ->  if overDebug then mailMan <<! ((sprintf "Received Instruction - %s" (string i)), ConsoleColor.Green)
                                 match i with
 
@@ -249,14 +239,12 @@ let currentGame (mailbox: Actor<Msg>) =
             | GameData g -> if overDebug then mailMan <<! ((sprintf "Received Data - %s" (string g)), ConsoleColor.Green)
                             match g with
                             | Fail f -> if debug then mailMan <<! (("Fail message received!! - " + string f), ConsoleColor.Red)
-                                        myPlayer <!& HighScore currentScore
-                                        mailMan <!& Fail f
-                                        scheduler <!! StopRandom
-                                        scheduler <!! StopAuto
-
-                                        if f = HardStop then myPlayer <!! KillMeNow //Changed from mailman...
-
-                                        return! loop(currentScore)
+                                        mailMan <!& HighScore currentScore
+                                        mailMan <!! StopRandom
+                                        mailMan <!! StopAuto
+                                        match f with
+                                        | Killed -> mailMan <!! KillMeNow //Will have come from client side
+                                        | _ -> mailMan <!& Fail f //Will have come from server side
 
                             | _ -> return! loop(currentScore)
 
@@ -266,96 +254,124 @@ let currentGame (mailbox: Actor<Msg>) =
     loop(Score 0)
 
 
-//Essentially functions as the Router
+//Essentially functions as the Router for the system
 let mailMan (player:Player) (mailbox: Actor<Msg>) =
+
+    let myPlayer = getParentActor mailbox
+    let scheduler = getSiblingActor mailbox Scheduler
+    let currentGame = getSiblingActor mailbox CurrentGame
+    let clickedHandler = getSiblingActor mailbox ClickedHandler
+    let autoPlayer = getSiblingActor mailbox AutoPlayer
 
     let rec loop (player:Player) = actor {
         let! message = mailbox.Receive ()
 
-        let consoleWriter = select "/user/consoleWriter" mailbox.Context
+        let consoleWriter = getSystemActor mailbox ConsoleWriter
 
         match message with
-            | Instruction (UpdatePlayer p) ->   consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "Player Updated") ConsoleColor.DarkRed}
+            | Instruction (UpdatePlayer p) ->   match getPlayerId p.PlayerId with
+                                                | Some i -> consoleWriter <<!((sprintf "Player Updated - id %i" i), ConsoleColor.DarkRed)
+                                                | None -> consoleWriter <<!((sprintf "Player Updated - No id"), ConsoleColor.Red)
+
+                                                Channel.sendMessageToPlayerClient p (SysMsg (PlayerUpdate p))
                                                 return! loop(p)
+
             | _ -> match message with
                         //If we receive an Instruction (probably but not necessarily from Client-side) we need to re-route it.
-                        | Instruction i ->  consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s Instruction received by MailMan" (string i)) ConsoleColor.DarkRed}
+                        | Instruction i ->  consoleWriter <<! (sprintf "%s Instruction received by MailMan" (string i), ConsoleColor.DarkRed)
                                             match i with
-                                            | StartGame _ -> select "../currentGame"  mailbox.Context <! message
-                                            | ClearNumbers -> select "../currentGame"  mailbox.Context <! message
+                                            | StartGame _ -> currentGame <!! i
+                                            | ClearNumbers -> currentGame <!! i
 
-                                            | StartRandom -> select "../scheduler"  mailbox.Context <! message
-                                            | StopRandom -> select "../scheduler"  mailbox.Context <! message
+                                            | StartRandom -> scheduler <!! i
+                                            | StopRandom -> scheduler <!! i
 
-                                            | NewClickedNumber _ -> select "../clickedHandler"  mailbox.Context <! message
+                                            | NewClickedNumber _ -> clickedHandler <!! i
 
-                                            | SingleAuto -> select "../auto"  mailbox.Context <! (Instruction Poke)
-                                            | StartAuto -> select "../scheduler"  mailbox.Context <! message
-                                            | StopAuto -> select "../scheduler"  mailbox.Context <! message
+                                            | SingleAuto -> autoPlayer <!! Poke
+                                            | StartAuto -> scheduler <!! i
+                                            | StopAuto -> scheduler <!! i
+
+                                            | KillMeNow -> myPlayer <!! i
 
                                             | _ -> ()
 
                         // If someone sends us data then we need to send it client-side as a Msg.
-                        | GameData g -> do Channel.sendMessageViaHub (getSocketID player.socketId) (GameData g) (sprintf "Communications Error %s" (string g)) |> ignore
-                                        consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s GameData received by MailMan" (string g)) ConsoleColor.DarkRed}
+                        | GameData g -> match g with
+                                        | HighScore _ -> myPlayer <!& g    //Send this onto the player for logging
+                                        | _ -> Channel.sendMessageToPlayerClient player (GameData g)
+                                               consoleWriter <<! (sprintf "%s GameData received by MailMan" (string g), ConsoleColor.DarkRed)
 
-                        | WriteToConsole m -> consoleWriter <!% {sender = player; msg = WriteToConsole m}
+                        | WriteToConsole _ -> consoleWriter <! message
 
-                        | PlayerMessage pm ->   do Channel.sendMessageViaHub (getSocketID player.socketId) message (sprintf "Communications Error %s" (string pm)) |> ignore
-                                                consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "MailMan has received message from %s" (getPlayerName pm.sender.playerName)) ConsoleColor.Blue}
+                        | PlayerMessage pm ->   Channel.sendMessageToPlayerClient player message
+                                                consoleWriter <<! (sprintf "MailMan has received message from %s" (getPlayerName pm.sender.PlayerName), ConsoleColor.Blue)
                                                 match pm.msg with
                                                 | GameData g -> match g with
-                                                                | Fail (HardStop) -> select "../currentGame"  mailbox.Context <!& g
+                                                                | Fail (Killed) -> getSiblingActor mailbox CurrentGame <!& g
                                                                 | _ -> ()
                                                 | _ -> ()
 
                         // If someone sends us data then we need to send it client-side as a Msg.
-                        | SysMsg s -> do Channel.sendMessageViaHub (getSocketID player.socketId) (SysMsg s) (sprintf "Communications Error %s" (string s)) |> ignore
-                                      consoleWriter <!% {sender = player; msg = cnslMsg (sprintf "%s SysData received by MailMan" (string s)) ConsoleColor.DarkRed}
+                        | SysMsg s -> Channel.sendMessageToPlayerClient player (SysMsg s)
+                                      consoleWriter <<! (sprintf "%s SysData received by MailMan" (string s), ConsoleColor.DarkRed)
 
                    return! loop (player)
     }
     loop (player)
 
+//Assign the correct subroutine to the Actor Type
+let getPlayerActorSpec (actor:PlayerActor) (player:Player) =
+    match actor with
+        | MailMan -> mailMan player
+        | RandomHandler -> randomHandler
+        | Scheduler -> scheduler
+        | ClickedHandler -> clickedHandler
+        | RandomGenerator -> randomNumberGenerator
+        | Validator -> validator
+        | CurrentGame -> currentGame
+        | AutoPlayer -> automaticPlayer
 
-let playerActor (playerSpec:Player) (mailbox : Actor<Msg>) =
 
-    let gamesMaster = select "/user/gamesMaster" mailbox.Context
-    let consoleWriter = select "/user/consoleWriter" mailbox.Context
+//Top-level Actor
+let playerActor (player:Player) (mailbox : Actor<Msg>) =
 
-    consoleWriter <! cnslMsg (sprintf "New player named %s has been created!" (getPlayerName playerSpec.playerName)) ConsoleColor.Green
+    let gamesMaster = getSystemActor mailbox GamesMaster
+    let consoleWriter = getSystemActor mailbox ConsoleWriter
+    consoleWriter <<! (sprintf "New player named %s has been created!" (getPlayerName player.PlayerName), ConsoleColor.Green)
 
     //Create the local hierarchy of Actors to fulfil the game functions
     //These are all child Actors of this actor
-    let mailMan = spawn mailbox.Context "mailMan" <| mailMan playerSpec
-    spawn mailbox.Context "randomHandler" randomHandler  |> ignore
-    spawn mailbox.Context "scheduler" (scheduler) |> ignore
-    spawn mailbox.Context "clickedHandler" clickedHandler |> ignore
-    spawn mailbox.Context "randomGenerator" randomNumberGenerator |> ignore
-    spawn mailbox.Context "validator" validator |> ignore
-    spawn mailbox.Context "currentGame" currentGame |> ignore
-    spawn mailbox.Context "auto" automaticPlayer |> ignore
+    [MailMan; RandomHandler; Scheduler; ClickedHandler; RandomGenerator; Validator; CurrentGame; AutoPlayer]
+    |> makePlayerActors mailbox player getPlayerActorSpec
+
+    let mailMan = getChildActor mailbox MailMan
 
     //Keep track of player's high score for the session
-    let rec loop (player:Player, highScore:Score) = actor {
-
+    let rec loop (player:Player) = actor {
         let! message = mailbox.Receive()
+        //Keeps track of player High Scores and forwards to the GamesMaster as required
+        //Also allows the player to be updated from the Client-side
 
-        //Receive a submission from a finished game to update the high score if applicable
-        //Also forwards to the GamesMaster
         match message with
-        | GameData (HighScore h) -> if (getScoreValue h) > (getScoreValue highScore) then
-                                        mailMan <! cnslMsg (sprintf "New high score of %i" (getScoreValue h)) ConsoleColor.DarkGreen
-                                        gamesMaster <!% {sender = player; msg = message}
-                                        return! loop(player, h)
-                                    else return! loop(player, highScore)
+        | GameData (HighScore h) -> if (getScoreValue h) > (getScoreValue player.HighScore) then
+                                        let updatedPlayer = {player with HighScore = h}
+                                        mailMan <!! UpdatePlayer updatedPlayer
+                                        mailMan <<! (sprintf "New high score of %i" (getScoreValue h),ConsoleColor.DarkGreen)
+                                        gamesMaster <!% {sender = updatedPlayer; msg = message} //Send the player with the updated high score
+                                        return! loop(updatedPlayer)
 
-        | Instruction (UpdatePlayer p) ->   mailMan <! message
-                                            return! loop(p, highScore)
+                                    else gamesMaster <!% {sender = player; msg = message} //Let's keep track of all scores, high or not!
+                                         return! loop(player)
 
-        //Anything else is forwarded on to the MailMan
+        | Instruction (UpdatePlayer p) -> mailMan <! message
+                                          mailMan <<! ("PA Updating Player", ConsoleColor.DarkBlue)
+                                          return! loop(p)
+
+        | Instruction (KillMeNow) -> gamesMaster <!% {sender = player; msg = message}
+
+        //Anything else is forwarded on to the MailMan to deal with
         | _ -> mailMan <! message
-               return! loop(player, highScore)
-        
+               return! loop(player)
     }
-    loop(playerSpec, Score 0)
+    loop(player)

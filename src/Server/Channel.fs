@@ -7,6 +7,7 @@ module Channel
     open Microsoft.Extensions.Logging
 
     open Shared.MessageTypes
+    open Shared.DataTypes
 
     let mutable webSocketHub: Option<Channels.ISocketHub> = None
 
@@ -26,6 +27,9 @@ module Channel
         | _,_ -> Console.WriteLine onError
     }
 
+    let sendMessageToPlayerClient (player:Player) msg =
+        do sendMessageViaHub (getSocketId player.SocketId) msg (sprintf "Communication error sending %s to %s" (string msg) player.refName) |> ignore
+        //Console.WriteLine ("Sending message on socket " + (string (getSocketId player.SocketId)))
 
 
 

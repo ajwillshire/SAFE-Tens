@@ -6,6 +6,7 @@ open Elmish.React
 open Thoth.Json
 open Shared
 open MessageTypes
+open Views
 
 
 module Channel =
@@ -30,15 +31,12 @@ module Channel =
 
             let rec connect () =
                 let url = "ws://localhost:8085/channel"
-
-                //if model.CommunicationMode = Model.BroadcastMode.ViaWebSocket then
-
                 let ws = WebSocket.Create(url)
                 ws.onmessage <- onWebSocketMessage
-                ws.onopen <- (fun ev ->
+                ws.onopen <- (fun _ ->
                     dispatch (SysMsg (ConnectionChange (ConnectedToServer (buildWsSender ws))))
                     printfn "WebSocket opened")
-                ws.onclose <- (fun ev ->
+                ws.onclose <- (fun _ ->
                     dispatch (SysMsg (ConnectionChange DisconnectedFromServer))
                     printfn "WebSocket closed. Retrying connection"
                     promise { 
@@ -51,15 +49,12 @@ module Channel =
 
 module WindowEvents =
     let unloadSub (model:Model.Model) =
-        let setUnloadEvent dispatch = 
-            Browser.Dom.window.onbeforeunload <- (fun _ -> dispatch (SysMsg (CloseEvent model.Player.socketId)))
-
+        let setUnloadEvent dispatch = Browser.Dom.window.onbeforeunload <- (fun _ -> dispatch (SysMsg (CloseEvent model.Player.SocketId)))
         Cmd.ofSub setUnloadEvent
 
 module KeyboardEvents =
     let keyPressSub =
-        let keyPress dispatch =
-            Browser.Dom.window.onkeypress <- (fun a -> dispatch (SysMsg (KeyPress a.key)))
+        let keyPress dispatch = Browser.Dom.window.onkeypress <- (fun a -> dispatch (SysMsg (KeyPress a.key)))
         Cmd.ofSub keyPress
 
 
@@ -91,7 +86,7 @@ open Elmish.HMR
 #endif
 
 
-Program.mkProgram Model.init Model.update ViewFeliz.render
+Program.mkProgram Model.init Model.update ViewRouter.render
 |> Program.withSubscription subs 
 #if DEBUG
 |> Program.withConsoleTrace

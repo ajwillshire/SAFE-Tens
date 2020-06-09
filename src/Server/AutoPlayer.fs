@@ -4,10 +4,8 @@ open System
 open Microsoft.FSharp.Core.Operators
 open Akka.FSharp
 
-open Shared
-open CommTypes
-open TensTypes
-open MessageTypes
+open Shared.DataTypes
+open Shared.MessageTypes
 
 let debug = true
 let overDebug = true
@@ -19,7 +17,7 @@ let private (<!) a (b:Msg) = a<!b
 let private (<!!) a (b:Instruction) = a <! (Instruction b)
 
 //Helper function to make it easier to send messages to the console
-let private cnslMsg m c = WriteToConsole ({msg = m; colour = int c} |> Complex)
+let private cnslMsg m c = WriteToConsole ({Text = m; Colour = int c} |> Complex)
 
 let private random = System.Random()
 
@@ -75,18 +73,18 @@ let automaticPlayer (mailbox: Actor<Msg>) =
                                                             else
                                                                 mailMan <! cnslMsg (sprintf "Indices: %i %i" myPair.indices.[0] myPair.indices.[1]) ConsoleColor.Magenta
                                                         
-                                                        let myFirstAutoclick = {number = n.[myPair.indices.[0]]; listIndex = myPair.indices.[0]}
+                                                        let myFirstAutoclick = {Number = n.[myPair.indices.[0]]; ListIndex = myPair.indices.[0]}
                                                         clickedHandler <!! NewClickedNumber myFirstAutoclick
-                                                        if overDebug then mailMan <! cnslMsg ("I picked the number " + string myFirstAutoclick.number) ConsoleColor.Magenta
+                                                        if overDebug then mailMan <! cnslMsg ("I picked the number " + string myFirstAutoclick.Number) ConsoleColor.Magenta
 
-                                                        let mySecondAutoclick = {number = n.[myPair.indices.[1]]; listIndex = myPair.indices.[1]-1} //The index is passed on so needs to subtract one, but the number itself isn't
+                                                        let mySecondAutoclick = {Number = n.[myPair.indices.[1]]; ListIndex = myPair.indices.[1]-1} //The index is passed on so needs to subtract one, but the number itself isn't
                                                         clickedHandler <!! NewClickedNumber mySecondAutoclick
-                                                        if overDebug then mailMan <! cnslMsg ("I picked the number " + string mySecondAutoclick.number) ConsoleColor.Magenta
+                                                        if overDebug then mailMan <! cnslMsg ("I picked the number " + string mySecondAutoclick.Number) ConsoleColor.Magenta
 
                                                         if myPair.indices.Length = 3 then
-                                                            let myThirdAutoclick = {number = n.[myPair.indices.[2]]; listIndex = myPair.indices.[2]-2} //The index is passed on so needs to subtract two, but the number itself isn't
+                                                            let myThirdAutoclick = {Number = n.[myPair.indices.[2]]; ListIndex = myPair.indices.[2]-2} //The index is passed on so needs to subtract two, but the number itself isn't
                                                             clickedHandler <!! NewClickedNumber myThirdAutoclick
-                                                            if overDebug then mailMan <! cnslMsg ("I picked the number " + string myThirdAutoclick.number) ConsoleColor.Magenta
+                                                            if overDebug then mailMan <! cnslMsg ("I picked the number " + string myThirdAutoclick.Number) ConsoleColor.Magenta
 
                                                      else
                                                         mailMan <! cnslMsg ("Nothing to pick!") ConsoleColor.DarkMagenta
